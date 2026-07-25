@@ -1218,7 +1218,10 @@ function renderAsset(pb){
   let lista=S.asset.filter(a=>{
     if(f.search){
       const q=f.search.toLowerCase();
-      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.seriale||''} ${a.note||''}`.toLowerCase().includes(q)) return false;
+      const au2=S.assetUtenti?.filter(x=>x.asset_id===a.id&&!x.data_a)[0];
+      const utente2=au2?S.profili.find(p=>p.id===au2.utente_id):null;
+      const uNome2=utente2?`${utente2.cognome} ${utente2.nome}`:'';
+      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.seriale||''} ${a.note||''} ${uNome2}`.toLowerCase().includes(q)) return false;
     }
     if(f.catId||f.subcatId){
       const sc=S.assetSubcat.find(x=>x.id===a.sottocategoria_id);
@@ -2562,10 +2565,10 @@ async function openAssetUtenteModal(assetId){
       <div style="font-size:12px;font-weight:700;color:var(--g700);margin-bottom:10px">👤 Nuova assegnazione</div>
       <div class="fr">
         <div class="fg"><div class="fl">Utente</div>
-          <select class="fse" id="au-utente">
-            <option value="">— Seleziona utente —</option>
-            ${[...S.profili].sort((a,b)=>a.cognome.localeCompare(b.cognome)).map(p=>`<option value="${p.id}">${esc(p.cognome)} ${esc(p.nome)}</option>`).join('')}
-          </select></div>
+          <input class="fi" id="au-utente-search" placeholder="🔍 Cerca cognome o nome…" autocomplete="off"/>
+          <input type="hidden" id="au-utente"/>
+          <div id="au-utente-results" style="border:1px solid var(--g200);border-radius:var(--rsm);max-height:160px;overflow-y:auto;display:none;background:#fff;box-shadow:var(--sh-sm);margin-top:2px"></div>
+        </div>
         <div class="fg"><div class="fl">Dal</div><input class="fi" id="au-dal" type="date" value="${new Date().toISOString().slice(0,10)}"/></div>
       </div>
     </div>`;
@@ -2588,7 +2591,7 @@ async function openAssetUtenteModal(assetId){
       }catch(e){toast(e.message,'err');}
     }},
   ]);
-  // Listener termina
+  // Listener termina + init ricerca utente
   setTimeout(()=>{
     document.querySelectorAll('[data-au-end]').forEach(b=>b.addEventListener('click',async()=>{
       const today=new Date().toISOString().slice(0,10);
@@ -2597,6 +2600,24 @@ async function openAssetUtenteModal(assetId){
       S._assetDirty=true;
       closeM(); renderAssetTable(); toast('Assegnazione terminata');
     }));
+    // Ricerca utente
+    const inp=$('au-utente-search'),hid=$('au-utente'),res=$('au-utente-results');
+    if(!inp) return;
+    const sorted=[...S.profili].sort((a,b)=>a.cognome.localeCompare(b.cognome));
+    const showMatches=q=>{
+      const matches=q?sorted.filter(p=>`${p.cognome} ${p.nome} ${p.email}`.toLowerCase().includes(q.toLowerCase())):sorted;
+      if(!matches.length){res.style.display='none';return;}
+      res.innerHTML=matches.slice(0,12).map(p=>`<div data-pid="${p.id}" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--g100)" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''"><strong>${esc(p.cognome)} ${esc(p.nome)}</strong> <span style="color:var(--g500);font-size:11px">${esc(p.email||'')}</span></div>`).join('');
+      res.style.display='block';
+      res.querySelectorAll('[data-pid]').forEach(el=>el.addEventListener('mousedown',ev=>{
+        ev.preventDefault();
+        const p=sorted.find(x=>x.id===el.dataset.pid);
+        hid.value=p.id; inp.value=`${p.cognome} ${p.nome}`; res.style.display='none';
+      }));
+    };
+    inp.addEventListener('input',()=>{hid.value='';showMatches(inp.value);});
+    inp.addEventListener('focus',()=>showMatches(inp.value));
+    inp.addEventListener('blur',()=>setTimeout(()=>{res.style.display='none';},200));
   },50);
 }
 
