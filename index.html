@@ -284,7 +284,7 @@ const S = {
   user: null, token: null, refreshToken: null,
   aree: [], sedi: [], categorie: [], sottocategorie: [], campi: [], valori: [], profili: [], log: [],
   ragioni: [], fornitori: [], assetCat: [], assetSubcat: [], asset: [], assetSedi: [], costi: [], documenti: [],
-  assetCaratteristiche: [],
+  assetCaratteristiche: [], assetProduttori: [], assetNoleggiatori: [], assetUtenti: [],
   verifiche: [], convenzioni: [], alertCfg: [], impianti: [], impiantiScadenze: [],
   page: 'griglia',
   // filtri griglia
@@ -310,6 +310,8 @@ const NAV_ADMIN = [
   {id:'ragioni',    l:'Ragioni sociali',   ic:''},
   {id:'aree',       l:'Aree geografiche',  ic:''},
   {id:'fornitori',  l:'Fornitori',         ic:''},
+  {id:'produttori',  l:'Produttori asset',  ic:''},
+  {id:'noleggiatori',l:'Noleggiatori asset', ic:''},
   {id:'struttura',  l:'Struttura',         ic:''},
   {id:'asset_cat',  l:'Asset: categorie',  ic:''},
   {id:'utenti',     l:'Utenti',            ic:''},
@@ -428,7 +430,7 @@ async function logAct(azione,dettaglio){
    CARICAMENTO DATI
 ══════════════════════════════════════════ */
 async function loadAll(){
-  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche]=await Promise.all([
+  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti]=await Promise.all([
     db('GET',T('aree'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('sedi'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('ragioni_sociali'),{ord:'nome.asc'}),
@@ -450,6 +452,9 @@ async function loadAll(){
     db('GET',T('impianti'),{ord:'nome.asc'}),
     db('GET',T('impianti_scadenze'),{ord:'data_scadenza.asc'}),
     db('GET',T('asset_caratteristiche'),{}),
+    db('GET',T('asset_produttori'),{ord:'nome.asc'}),
+    db('GET',T('asset_noleggiatori'),{ord:'nome.asc'}),
+    db('GET',T('asset_utenti'),{ord:'data_da.desc'}),
   ]);
   S.aree=aree||[];S.sedi=sedi||[];S.ragioni=ragioni||[];S.categorie=categorie||[];
   S.sottocategorie=sottocategorie||[];S.campi=campi||[];
@@ -458,6 +463,7 @@ async function loadAll(){
   S.assetSedi=assetSedi||[];S.fornitori=fornitori||[];S.costi=costi||[];
   S.verifiche=verifiche||[];S.convenzioni=convenzioni||[];S.alertCfg=alertCfg||[];
   S.impianti=impianti||[];S.impiantiScadenze=impiantiScadenze||[];S.assetCaratteristiche=assetCaratteristiche||[];
+  S.assetProduttori=assetProduttori||[];S.assetNoleggiatori=assetNoleggiatori||[];S.assetUtenti=assetUtenti||[];
   // init sedi sel default (tutte)
   if(!S.griglia.sediSel.length) S.griglia.sediSel=sediOrdinate().map(s=>s.id);
   // mappa: default nessuna sede selezionata (popup tutti chiusi)
@@ -626,7 +632,9 @@ function renderPage(){
   else if(S.page==='costi_ric') renderCostiRiepilogo(pb);
   else if(S.page==='sedi')      renderSediPage(pb);
   else if(S.page==='ragioni')   renderRagioni(pb);
-  else if(S.page==='fornitori') renderFornitori(pb);
+  else if(S.page==='fornitori')   renderFornitori(pb);
+  else if(S.page==='produttori')   renderProduttori(pb);
+  else if(S.page==='noleggiatori') renderNoleggiatori(pb);
   else if(S.page==='verifiche')  renderVerifiche(pb);
   else if(S.page==='convenzioni')renderConvenzioni(pb);
   else if(S.page==='impianti')   renderImpianti(pb);
@@ -1287,7 +1295,13 @@ function buildAssetTableHTML(lista){
     const costiA=S.costi.filter(x=>x.asset_id===a.id).length;
     return `<tr>
       <td><span style="font-family:monospace;font-size:12px;color:var(--g500)">${esc(a.codice||'—')}</span></td>
-      <td><div class="tn">${esc(a.nome)}</div><div class="ts">${[a.marca,a.seriale,a.anno?'Anno '+a.anno:''].filter(Boolean).join(' · ')}</div></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="tn">${esc(a.nome)}</div>
+          ${a.property==='rent'?'<span class="bg" style="background:#FEF3C7;color:#92400E;font-size:10px">Noleggio</span>':''}
+        </div>
+        <div class="ts">${[a.produttore_id?S.assetProduttori.find(p=>p.id===a.produttore_id)?.nome:a.marca,a.modello,a.seriale,a.anno?'Anno '+a.anno:''].filter(Boolean).join(' · ')}</div>
+      </td>
       <td><span style="font-size:12px">${esc(assetNomeCategoria(a.id))}</span></td>
       <td>${ub?`<span class="bg bg-on">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>'}</td>
       <td>${costiA?`<span class="bg" style="background:var(--blue-xlight);color:var(--navy)">${costiA} costi</span>`:'—'}</td>
@@ -1303,6 +1317,7 @@ function buildAssetTableHTML(lista){
         <button class="btn bs bsm" data-adoc="${a.id}" title="Documenti">📎</button>
         <button class="btn bs bsm" data-aloc="${a.id}" title="Ubicazioni">📍</button>
         <button class="btn bs bsm" data-acost="${a.id}" title="Costi">💰</button>
+        ${(()=>{const au=S.assetUtenti.filter(x=>x.asset_id===a.id&&!x.data_a)[0];const utente=au?S.profili.find(p=>p.id===au.utente_id):null;return `<button class="btn bsm" data-auser="${a.id}" title="${utente?utente.cognome+' '+utente.nome:'Nessun utente'}" style="background:${au?'var(--verde)':'var(--g100)'};color:${au?'#fff':'var(--g500)'};border:1px solid var(--g200);cursor:pointer;border-radius:var(--rsm);padding:3px 7px;font-size:13px">👤</button>`;})()}
         <button class="btn bs bsm" data-ae="${a.id}">✏</button>
         <button class="btn bd bsm" data-ad="${a.id}">🗑</button>
       </div></td>
@@ -1354,6 +1369,7 @@ function bindAssetTableEvents(){
   wrap.querySelectorAll('[data-aloc]').forEach(b=>b.addEventListener('click',()=>openUbicazioniModal(b.dataset.aloc)));
   wrap.querySelectorAll('[data-acost]').forEach(b=>b.addEventListener('click',()=>openCostiAssetModal(b.dataset.acost)));
   wrap.querySelectorAll('[data-acar]').forEach(b=>b.addEventListener('click',()=>openCaratteristicheModal(b.dataset.acar,b.dataset.tipo)));
+  wrap.querySelectorAll('[data-auser]').forEach(b=>b.addEventListener('click',()=>openAssetUtenteModal(b.dataset.auser)));
 }
 
 async function openCaratteristicheModal(assetId, tipo){
@@ -1412,18 +1428,50 @@ async function openCaratteristicheModal(assetId, tipo){
 }
 
 function openAssetModal(a){
+  const propVal=a?.property||'owned';
   const body=`
     <div class="fr">
       <div class="fg"><div class="fl">Codice asset</div><input class="fi" id="am-cod" value="${esc(a?.codice||'')}"/></div>
       <div class="fg"><div class="fl">Nome *</div><input class="fi" id="am-nome" value="${esc(a?.nome||'')}"/></div>
     </div>
     <div class="fr">
-      <div class="fg"><div class="fl">Marca</div><input class="fi" id="am-marca" value="${esc(a?.marca||'')}"/></div>
+      <div class="fg"><div class="fl">Produttore</div>
+        <select class="fse" id="am-prod">
+          <option value="">— Nessuno —</option>
+          ${S.assetProduttori.map(p=>`<option value="${p.id}"${a?.produttore_id===p.id?' selected':''}>${esc(p.nome)}</option>`).join('')}
+        </select></div>
+      <div class="fg"><div class="fl">Marca (testo libero)</div><input class="fi" id="am-marca" value="${esc(a?.marca||'')}"/></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Modello</div><input class="fi" id="am-modello" value="${esc(a?.modello||'')}"/></div>
       <div class="fg"><div class="fl">Seriale</div><input class="fi" id="am-seriale" value="${esc(a?.seriale||'')}"/></div>
     </div>
     <div class="fr">
       <div class="fg"><div class="fl">Anno</div><input class="fi" id="am-anno" type="number" min="1900" max="2100" value="${a?.anno||''}" placeholder="es. 2021"/></div>
       <div class="fg"><div class="fl">Data collaudo</div><input class="fi" id="am-collaudo" type="date" value="${a?.collaudo||''}"/></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><div class="fl">MAC Address</div><input class="fi" id="am-mac" value="${esc(a?.mac_address||'')}" placeholder="es. 00:1A:2B:3C:4D:5E"/></div>
+      <div class="fg"><div class="fl">AnyDesk ID</div><input class="fi" id="am-anydesk" value="${esc(a?.anydesk||'')}"/></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Microsoft 365 User</div><input class="fi" id="am-m365" value="${esc(a?.microsoft_365_user||'')}"/></div>
+      <div class="fg"><div class="fl">Proprietà</div>
+        <select class="fse" id="am-property" onchange="document.getElementById('am-rent-wrap').style.display=this.value==='rent'?'':'none'">
+          <option value="owned"${propVal==='owned'?' selected':''}>Di proprietà</option>
+          <option value="rent"${propVal==='rent'?' selected':''}>Noleggio</option>
+        </select></div>
+    </div>
+    <div id="am-rent-wrap" style="display:${propVal==='rent'?'':'none'}">
+      <div class="fr">
+        <div class="fg"><div class="fl">Noleggiatore</div>
+          <select class="fse" id="am-nol">
+            <option value="">— Nessuno —</option>
+            ${S.assetNoleggiatori.map(n=>`<option value="${n.id}"${a?.noleggiatore_id===n.id?' selected':''}>${esc(n.nome)}</option>`).join('')}
+          </select></div>
+        <div class="fg"><div class="fl">Inizio noleggio</div><input class="fi" id="am-rstart" type="date" value="${a?.rental_start||''}"/></div>
+        <div class="fg"><div class="fl">Fine noleggio</div><input class="fi" id="am-rend" type="date" value="${a?.rental_end||''}"/></div>
+      </div>
     </div>
     <div class="fg"><div class="fl">Categoria</div>
       <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+S.assetSubcat.filter(sc=>sc.categoria_id===this.value).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
@@ -1445,8 +1493,24 @@ function openAssetModal(a){
       const sub=$('am-sub').value,note=$('am-note').value.trim();
       if(!nome){toast('Il nome è obbligatorio','err');return;}
       try{
-        const marca=$('am-marca').value.trim(),seriale=$('am-seriale').value.trim(),anno=$('am-anno').value,collaudo=$('am-collaudo').value;
-        const payload={nome,codice:cod||null,marca:marca||null,seriale:seriale||null,anno:anno?parseInt(anno):null,collaudo:collaudo||null,sottocategoria_id:sub||null,note:note||null};
+        const marca=$('am-marca').value.trim(),seriale=$('am-seriale').value.trim();
+        const anno=$('am-anno').value,collaudo=$('am-collaudo').value;
+        const property=$('am-property').value;
+        const payload={nome,codice:cod||null,
+          produttore_id:$('am-prod').value||null,
+          marca:marca||null,
+          modello:$('am-modello').value.trim()||null,
+          seriale:seriale||null,
+          anno:anno?parseInt(anno):null,
+          collaudo:collaudo||null,
+          mac_address:$('am-mac').value.trim()||null,
+          anydesk:$('am-anydesk').value.trim()||null,
+          microsoft_365_user:$('am-m365').value.trim()||null,
+          property,
+          noleggiatore_id:property==='rent'?($('am-nol').value||null):null,
+          rental_start:property==='rent'?($('am-rstart').value||null):null,
+          rental_end:property==='rent'?($('am-rend').value||null):null,
+          sottocategoria_id:sub||null,note:note||null};
         if(a){
           await db('PATCH',T('asset'),{flt:`id=eq.${a.id}`,body:payload});
           S.asset=S.asset.map(x=>x.id===a.id?{...x,...payload}:x);
@@ -2460,6 +2524,162 @@ async function openImpiantoModal(imp){
     });
   }
   setTimeout(bindScadenze,50);
+}
+
+/* ══════════════════════════════════════════
+   ASSEGNAZIONE ASSET - UTENTE
+══════════════════════════════════════════ */
+async function openAssetUtenteModal(assetId){
+  const a=S.asset.find(x=>x.id===assetId);
+  const storici=S.assetUtenti.filter(x=>x.asset_id===assetId).sort((a,b)=>b.data_da.localeCompare(a.data_da));
+  const attuale=storici.find(x=>!x.data_a);
+
+  const renderStorico=()=>!storici.length
+    ?`<div class="emp"><div class="ems">Nessuna assegnazione</div></div>`
+    :`<table class="dt"><thead><tr><th>Utente</th><th>Dal</th><th>Al</th><th></th></tr></thead><tbody>
+    ${storici.map(au=>{
+      const u=S.profili.find(p=>p.id===au.utente_id);
+      return `<tr${!au.data_a?' style="font-weight:600"':''}>
+        <td>${esc(u?u.cognome+' '+u.nome:'Utente eliminato')}</td>
+        <td>${fmtDate(au.data_da)}</td>
+        <td>${au.data_a?fmtDate(au.data_a):'<span class="bg bg-on" style="font-size:11px">In uso</span>'}</td>
+        <td>${!au.data_a?`<button class="btn bd bsm" data-au-end="${au.id}">Termina</button>`:''}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+
+  const body=`
+    <div style="font-size:13px;color:var(--g500);margin-bottom:12px">Asset: <strong>${esc(a?.nome||'')}</strong>${a?.codice?` (${esc(a.codice)})`:''}</div>
+    <div id="au-storico">${renderStorico()}</div>
+    <div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--g700);margin-bottom:10px">👤 Nuova assegnazione</div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Utente</div>
+          <select class="fse" id="au-utente">
+            <option value="">— Seleziona utente —</option>
+            ${[...S.profili].sort((a,b)=>a.cognome.localeCompare(b.cognome)).map(p=>`<option value="${p.id}">${esc(p.cognome)} ${esc(p.nome)}</option>`).join('')}
+          </select></div>
+        <div class="fg"><div class="fl">Dal</div><input class="fi" id="au-dal" type="date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      </div>
+    </div>`;
+
+  openM(`👤 Utente — ${a?.nome}`,body,[
+    {l:'Chiudi',c:'bs',a:closeM},
+    {l:'Assegna',c:'bpg',a:async()=>{
+      const uid=$('au-utente').value,dal=$('au-dal').value;
+      if(!uid){toast('Seleziona un utente','err');return;}
+      try{
+        // Termina eventuale assegnazione corrente
+        if(attuale){
+          await db('PATCH',T('asset_utenti'),{flt:`id=eq.${attuale.id}`,body:{data_a:dal}});
+          S.assetUtenti=S.assetUtenti.map(x=>x.id===attuale.id?{...x,data_a:dal}:x);
+        }
+        const [na]=await db('POST',T('asset_utenti'),{body:{asset_id:assetId,utente_id:uid,data_da:dal}});
+        S.assetUtenti.push(na);
+        S._assetDirty=true;
+        closeM(); renderAssetTable(); toast('Asset assegnato ✅');
+      }catch(e){toast(e.message,'err');}
+    }},
+  ]);
+  // Listener termina
+  setTimeout(()=>{
+    document.querySelectorAll('[data-au-end]').forEach(b=>b.addEventListener('click',async()=>{
+      const today=new Date().toISOString().slice(0,10);
+      await db('PATCH',T('asset_utenti'),{flt:`id=eq.${b.dataset.auEnd}`,body:{data_a:today}});
+      S.assetUtenti=S.assetUtenti.map(x=>x.id===b.dataset.auEnd?{...x,data_a:today}:x);
+      S._assetDirty=true;
+      closeM(); renderAssetTable(); toast('Assegnazione terminata');
+    }));
+  },50);
+}
+
+/* ══════════════════════════════════════════
+   PAGINA PRODUTTORI ASSET
+══════════════════════════════════════════ */
+function renderProduttori(pb){
+  const isAdm=['admin','asset'].includes(S.user?.ruolo);
+  pb.innerHTML=`<div class="fian"><div class="card">
+    <div class="ch"><span class="ct">Produttori asset (${S.assetProduttori.length})</span>
+      ${isAdm?`<button class="btn bpg bsm" id="prod-add">+ Nuovo</button>`:''}
+    </div>
+    ${!S.assetProduttori.length?`<div class="emp"><div class="emi">🏭</div><div class="emt">Nessun produttore</div></div>`:
+    `<table class="dt"><thead><tr><th>Nome</th><th>Note</th><th>Asset</th><th>Azioni</th></tr></thead><tbody>
+    ${S.assetProduttori.map(p=>`<tr>
+      <td class="tn">${esc(p.nome)}</td>
+      <td style="font-size:12px;color:var(--g500)">${esc(p.note||'')}</td>
+      <td><span class="bg bg-usr">${S.asset.filter(a=>a.produttore_id===p.id).length} asset</span></td>
+      <td><div class="tda">
+        <button class="btn bs bsm" data-prode="${p.id}">✏</button>
+        <button class="btn bd bsm" data-prodd="${p.id}">🗑</button>
+      </div></td>
+    </tr>`).join('')}
+    </tbody></table>`}
+  </div></div>`;
+  $('prod-add')?.addEventListener('click',()=>openProduttoreModal(null));
+  pb.querySelectorAll('[data-prode]').forEach(b=>b.addEventListener('click',()=>openProduttoreModal(S.assetProduttori.find(x=>x.id===b.dataset.prode))));
+  pb.querySelectorAll('[data-prodd]').forEach(b=>b.addEventListener('click',()=>{
+    const p=S.assetProduttori.find(x=>x.id===b.dataset.prodd);
+    openConf(`Eliminare "${p?.nome}"?`,async()=>{
+      await db('DELETE',T('asset_produttori'),{flt:`id=eq.${b.dataset.prodd}`});
+      S.assetProduttori=S.assetProduttori.filter(x=>x.id!==b.dataset.prodd); renderPage(); toast('Eliminato');
+    });
+  }));
+}
+function openProduttoreModal(p){
+  openM(p?'✏ Modifica produttore':'+ Nuovo produttore',`
+    <div class="fg"><div class="fl">Nome *</div><input class="fi" id="pm-nome" value="${esc(p?.nome||'')}"/></div>
+    <div class="fg"><div class="fl">Note</div><textarea class="fta" id="pm-note">${esc(p?.note||'')}</textarea></div>`,
+  [{l:'Annulla',c:'bs',a:closeM},{l:'Salva',c:'bpg',a:async()=>{
+    const nome=$('pm-nome').value.trim(); if(!nome){toast('Nome obbligatorio','err');return;}
+    const payload={nome,note:$('pm-note').value.trim()||null};
+    if(p){await db('PATCH',T('asset_produttori'),{flt:`id=eq.${p.id}`,body:payload});S.assetProduttori=S.assetProduttori.map(x=>x.id===p.id?{...x,...payload}:x);}
+    else{const[np]=await db('POST',T('asset_produttori'),{body:payload});S.assetProduttori.push(np);}
+    closeM();renderPage();toast(p?'Aggiornato':'Aggiunto ✅');
+  }}]);
+}
+
+/* ══════════════════════════════════════════
+   PAGINA NOLEGGIATORI ASSET
+══════════════════════════════════════════ */
+function renderNoleggiatori(pb){
+  const isAdm=['admin','asset'].includes(S.user?.ruolo);
+  pb.innerHTML=`<div class="fian"><div class="card">
+    <div class="ch"><span class="ct">Noleggiatori asset (${S.assetNoleggiatori.length})</span>
+      ${isAdm?`<button class="btn bpg bsm" id="nol-add">+ Nuovo</button>`:''}
+    </div>
+    ${!S.assetNoleggiatori.length?`<div class="emp"><div class="emi">🤝</div><div class="emt">Nessun noleggiatore</div></div>`:
+    `<table class="dt"><thead><tr><th>Nome</th><th>Note</th><th>Asset in noleggio</th><th>Azioni</th></tr></thead><tbody>
+    ${S.assetNoleggiatori.map(n=>`<tr>
+      <td class="tn">${esc(n.nome)}</td>
+      <td style="font-size:12px;color:var(--g500)">${esc(n.note||'')}</td>
+      <td><span class="bg bg-usr">${S.asset.filter(a=>a.noleggiatore_id===n.id).length} asset</span></td>
+      <td><div class="tda">
+        <button class="btn bs bsm" data-nole="${n.id}">✏</button>
+        <button class="btn bd bsm" data-nold="${n.id}">🗑</button>
+      </div></td>
+    </tr>`).join('')}
+    </tbody></table>`}
+  </div></div>`;
+  $('nol-add')?.addEventListener('click',()=>openNoleggiiatoreModal(null));
+  pb.querySelectorAll('[data-nole]').forEach(b=>b.addEventListener('click',()=>openNoleggiiatoreModal(S.assetNoleggiatori.find(x=>x.id===b.dataset.nole))));
+  pb.querySelectorAll('[data-nold]').forEach(b=>b.addEventListener('click',()=>{
+    const n=S.assetNoleggiatori.find(x=>x.id===b.dataset.nold);
+    openConf(`Eliminare "${n?.nome}"?`,async()=>{
+      await db('DELETE',T('asset_noleggiatori'),{flt:`id=eq.${b.dataset.nold}`});
+      S.assetNoleggiatori=S.assetNoleggiatori.filter(x=>x.id!==b.dataset.nold); renderPage(); toast('Eliminato');
+    });
+  }));
+}
+function openNoleggiiatoreModal(n){
+  openM(n?'✏ Modifica noleggiatore':'+ Nuovo noleggiatore',`
+    <div class="fg"><div class="fl">Nome *</div><input class="fi" id="nm-nome" value="${esc(n?.nome||'')}"/></div>
+    <div class="fg"><div class="fl">Note</div><textarea class="fta" id="nm-note">${esc(n?.note||'')}</textarea></div>`,
+  [{l:'Annulla',c:'bs',a:closeM},{l:'Salva',c:'bpg',a:async()=>{
+    const nome=$('nm-nome').value.trim(); if(!nome){toast('Nome obbligatorio','err');return;}
+    const payload={nome,note:$('nm-note').value.trim()||null};
+    if(n){await db('PATCH',T('asset_noleggiatori'),{flt:`id=eq.${n.id}`,body:payload});S.assetNoleggiatori=S.assetNoleggiatori.map(x=>x.id===n.id?{...x,...payload}:x);}
+    else{const[nn]=await db('POST',T('asset_noleggiatori'),{body:payload});S.assetNoleggiatori.push(nn);}
+    closeM();renderPage();toast(n?'Aggiornato':'Aggiunto ✅');
+  }}]);
 }
 
 function renderFornitori(pb){
