@@ -1296,8 +1296,9 @@ function buildAssetTableHTML(lista){
   if(!lista.length) return `<div class="emp"><div class="emi">🔧</div><div class="emt">Nessun asset trovato</div></div>`;
   const oggi=new Date().toISOString().slice(0,10);
   const f2=S.asset_filter||{};
+  const isIT=S.user?.ruolo==='it';
   const thS=(col,lbl)=>{const active=f2.sort===col;return `<th style="cursor:pointer;user-select:none" data-asort="${col}">${lbl}${active?(f2.sortDir===1?' ↑':' ↓'):''}</th>`;};
-  return `<table class="dt"><thead><tr>${thS('codice','Codice')}${thS('nome','Nome')}${thS('categoria','Categoria')}${thS('assegnazione','Assegnazione')}<th>Costi</th><th>Azioni</th></tr></thead><tbody>
+  return `<table class="dt"><thead><tr>${thS('codice','Codice')}${thS('nome','Nome')}${thS('categoria','Categoria')}${thS('assegnazione','Assegnazione')}${isIT?'':'<th>Costi</th>'}<th>Azioni</th></tr></thead><tbody>
   ${lista.map(a=>{
     const ub=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
     const costiA=S.costi.filter(x=>x.asset_id===a.id).length;
@@ -1316,9 +1317,9 @@ function buildAssetTableHTML(lista){
         if(au){const u=S.profili.find(p=>p.id===au.utente_id);return u?`<span class="bg bg-it" style="font-size:11px">${esc(u.cognome+' '+u.nome)}</span>`:'<span class="bg bg-usr">Utente</span>';}
         return ub?`<span class="bg bg-on">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>';
       })()}</td>
-      <td>${costiA?`<span class="bg" style="background:var(--blue-xlight);color:var(--navy)">${costiA} costi</span>`:'—'}</td>
+      ${isIT?'':`<td>${costiA?`<span class="bg" style="background:var(--blue-xlight);color:var(--navy)">${costiA} costi</span>`:'—'}</td>`}
       <td><div class="tda">
-        ${(()=>{
+        ${isIT?'':(()=>{
           const sc=S.assetSubcat.find(x=>x.id===a.sottocategoria_id);
           const cat=S.assetCat.find(x=>x.id===sc?.categoria_id);
           if(!cat?.macchine) return '<span style="display:inline-block;width:29px;height:25px;border:1px solid var(--g200);border-radius:var(--rsm);background:transparent;margin:0 1px"></span><span style="display:inline-block;width:29px;height:25px;border:1px solid var(--g200);border-radius:var(--rsm);background:transparent;margin:0 1px"></span><span style="display:inline-block;width:29px;height:25px;border:1px solid var(--g200);border-radius:var(--rsm);background:transparent;margin:0 1px"></span>';
@@ -1328,7 +1329,7 @@ function buildAssetTableHTML(lista){
         })()}
         <button class="btn bs bsm" data-adoc="${a.id}" title="Documenti">📎</button>
         <button class="btn bs bsm" data-aloc="${a.id}" title="Ubicazioni">📍</button>
-        <button class="btn bs bsm" data-acost="${a.id}" title="Costi">💰</button>
+        ${isIT?'':`<button class="btn bs bsm" data-acost="${a.id}" title="Costi">💰</button>`}
         ${(()=>{const au=S.assetUtenti.filter(x=>x.asset_id===a.id&&!x.data_a)[0];const utente=au?S.profili.find(p=>p.id===au.utente_id):null;return `<button class="btn bsm" data-auser="${a.id}" title="${utente?utente.cognome+' '+utente.nome:'Nessun utente'}" style="background:${au?'var(--verde)':'var(--g100)'};color:${au?'#fff':'var(--g500)'};border:1px solid var(--g200);cursor:pointer;border-radius:var(--rsm);padding:3px 7px;font-size:13px">👤</button>`;})()}
         <button class="btn bs bsm" data-ae="${a.id}">✏</button>
         <button class="btn bd bsm" data-ad="${a.id}">🗑</button>
@@ -1491,16 +1492,7 @@ function openAssetModal(a){
     <div class="fr">
       <div class="fg"><div class="fl">Anno</div><input class="fi" id="am-anno" type="number" min="1900" max="2100" value="${a?.anno||''}" placeholder="es. 2021"/></div>
       <div class="fg"><div class="fl">Data collaudo</div><input class="fi" id="am-collaudo" type="date" value="${a?.collaudo||''}"/></div>
-    </div>
-    <div class="fr">
       <div class="fg"><div class="fl">MAC Address</div><input class="fi" id="am-mac" value="${esc(a?.mac_address||'')}" placeholder="es. 00:1A:2B:3C:4D:5E"/></div>
-      <div class="fg"><div class="fl">AnyDesk ID</div><input class="fi" id="am-anydesk" value="${esc(a?.anydesk||'')}"/></div>
-    </div>
-    <div class="fr">
-      <div class="fr">
-        <div class="fg"><div class="fl">Microsoft 365 User</div><input class="fi" id="am-m365" value="${esc(a?.microsoft_365_user||'')}"/></div>
-        <div class="fg"><div class="fl">Microsoft 365 PIN</div><input class="fi" id="am-pin" value="${esc(a?.microsoft_365_pin||'')}"/></div>
-      </div>
       <div class="fg"><div class="fl">Proprietà</div>
         <select class="fse" id="am-property" onchange="document.getElementById('am-rent-wrap').style.display=this.value==='rent'?'':'none'">
           <option value="owned"${propVal==='owned'?' selected':''}>Di proprietà</option>
@@ -1518,18 +1510,25 @@ function openAssetModal(a){
         <div class="fg"><div class="fl">Fine noleggio</div><input class="fi" id="am-rend" type="date" value="${a?.rental_end||''}"/></div>
       </div>
     </div>
-    <div class="fg"><div class="fl">Categoria</div>
-      <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+[...S.assetSubcat.filter(sc=>sc.categoria_id===this.value)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
-        <option value="">— Nessuna —</option>
-        ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<option value="${cat.id}"${S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id===cat.id?' selected':''}>${esc(cat.icona||'')} ${esc(cat.nome)}</option>`).join('')}
-      </select>
+    <div class="fr">
+      <div class="fg"><div class="fl">Microsoft 365 User</div><input class="fi" id="am-m365" value="${esc(a?.microsoft_365_user||'')}"/></div>
+      <div class="fg"><div class="fl">Microsoft 365 PIN</div><input class="fi" id="am-pin" value="${esc(a?.microsoft_365_pin||'')}"/></div>
     </div>
-    <div class="fg"><div class="fl">Sottocategoria</div>
-      <select class="fse" id="am-sub">
-        <option value="">— Nessuna —</option>
-        ${(()=>{const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';return [...S.assetSubcat.filter(sc=>!catId||sc.categoria_id===catId)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>`<option value="${sc.id}"${sc.id===a?.sottocategoria_id?' selected':''}>${esc(sc.nome)}</option>`).join('');})()}
-      </select>
+    <div class="fr">
+      <div class="fg"><div class="fl">Categoria</div>
+        <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+[...S.assetSubcat.filter(sc=>sc.categoria_id===this.value)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
+          <option value="">— Nessuna —</option>
+          ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<option value="${cat.id}"${S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id===cat.id?' selected':''}>${esc(cat.icona||'')} ${esc(cat.nome)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg"><div class="fl">Sottocategoria</div>
+        <select class="fse" id="am-sub">
+          <option value="">— Nessuna —</option>
+          ${(()=>{const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';return [...S.assetSubcat.filter(sc=>!catId||sc.categoria_id===catId)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>`<option value="${sc.id}"${sc.id===a?.sottocategoria_id?' selected':''}>${esc(sc.nome)}</option>`).join('');})()}
+        </select>
+      </div>
     </div>
+    <div class="fg"><div class="fl">AnyDesk ID</div><input class="fi" id="am-anydesk" value="${esc(a?.anydesk||'')}"/></div>
     <div class="fg"><div class="fl">Note</div><textarea class="fta" id="am-note">${esc(a?.note||'')}</textarea></div>`;
   openM(a?'✏ Modifica asset':'+ Nuovo asset',body,[
     {l:'Annulla',c:'bs',a:closeM},
