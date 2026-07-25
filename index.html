@@ -1212,7 +1212,7 @@ function ragioneNome(id){ return S.ragioni.find(r=>r.id===id)?.nome||'—'; }
    PAGINA ASSET
 ══════════════════════════════════════════ */
 function renderAsset(pb){
-  if(!S.asset_filter) S.asset_filter={search:'',catId:S.user?.ruolo==='it'?'cce7f33a-80d0-4b03-bf27-aefca23f9922':'',subcatId:'',sedeId:'',_focus:null};
+  if(!S.asset_filter) S.asset_filter={search:'',catId:S.user?.ruolo==='it'?'cce7f33a-80d0-4b03-bf27-aefca23f9922':'',subcatId:'',sedeId:'',sort:'codice',sortDir:1,_focus:null};
   const f=S.asset_filter;
   const oggi2=new Date().toISOString().slice(0,10);
   let lista=S.asset.filter(a=>{
@@ -1295,7 +1295,9 @@ function renderAsset(pb){
 function buildAssetTableHTML(lista){
   if(!lista.length) return `<div class="emp"><div class="emi">🔧</div><div class="emt">Nessun asset trovato</div></div>`;
   const oggi=new Date().toISOString().slice(0,10);
-  return `<table class="dt"><thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Assegnazione</th><th>Costi</th><th>Azioni</th></tr></thead><tbody>
+  const f2=S.asset_filter||{};
+  const thS=(col,lbl)=>{const active=f2.sort===col;return `<th style="cursor:pointer;user-select:none" data-asort="${col}">${lbl}${active?(f2.sortDir===1?' ↑':' ↓'):''}</th>`;};
+  return `<table class="dt"><thead><tr>${thS('codice','Codice')}${thS('nome','Nome')}${thS('categoria','Categoria')}${thS('assegnazione','Assegnazione')}<th>Costi</th><th>Azioni</th></tr></thead><tbody>
   ${lista.map(a=>{
     const ub=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
     const costiA=S.costi.filter(x=>x.asset_id===a.id).length;
@@ -1361,6 +1363,20 @@ function renderAssetTable(){
     }
     return true;
   });
+  // Ordinamento
+  const sf=S.asset_filter||{};
+  const oggi2=new Date().toISOString().slice(0,10);
+  lista.sort((a,b)=>{
+    let va='',vb='';
+    if(sf.sort==='codice'){va=a.codice||'';vb=b.codice||'';}
+    else if(sf.sort==='nome'){va=a.nome||'';vb=b.nome||'';}
+    else if(sf.sort==='categoria'){va=assetNomeCategoria(a.id);vb=assetNomeCategoria(b.id);}
+    else if(sf.sort==='assegnazione'){
+      const getLabel=x=>{const au=S.assetUtenti?.filter(u=>u.asset_id===x.id&&!u.data_a)[0];if(au){const u=S.profili.find(p=>p.id===au.utente_id);return u?u.cognome+' '+u.nome:'';}const ub=S.assetSedi.filter(u=>u.asset_id===x.id&&u.data_da<=oggi2&&(!u.data_a||u.data_a>=oggi2)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];return ub?sedeNome(ub.sede_id):'';};
+      va=getLabel(a);vb=getLabel(b);
+    }
+    return sf.sortDir*(va.localeCompare(vb));
+  });
   const wrap=$('asset-table-wrap'); if(!wrap) return;
   wrap.innerHTML=`<div class="ch"><span class="ct">🔧 Asset (${lista.length})</span></div>${buildAssetTableHTML(lista)}`;
   bindAssetTableEvents();
@@ -1373,6 +1389,12 @@ function renderAssetTable(){
 
 function bindAssetTableEvents(){
   const wrap=$('asset-table-wrap'); if(!wrap) return;
+  wrap.querySelectorAll('[data-asort]').forEach(th=>th.addEventListener('click',()=>{
+    const f=S.asset_filter||{};
+    if(f.sort===th.dataset.asort) f.sortDir=(f.sortDir||1)*-1;
+    else{f.sort=th.dataset.asort;f.sortDir=1;}
+    renderAssetTable();
+  }));
   wrap.querySelectorAll('[data-ae]').forEach(b=>b.addEventListener('click',()=>openAssetModal(S.asset.find(x=>x.id===b.dataset.ae))));
   wrap.querySelectorAll('[data-ad]').forEach(b=>b.addEventListener('click',()=>{
     const a=S.asset.find(x=>x.id===b.dataset.ad);
@@ -1475,7 +1497,10 @@ function openAssetModal(a){
       <div class="fg"><div class="fl">AnyDesk ID</div><input class="fi" id="am-anydesk" value="${esc(a?.anydesk||'')}"/></div>
     </div>
     <div class="fr">
-      <div class="fg"><div class="fl">Microsoft 365 User</div><input class="fi" id="am-m365" value="${esc(a?.microsoft_365_user||'')}"/></div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Microsoft 365 User</div><input class="fi" id="am-m365" value="${esc(a?.microsoft_365_user||'')}"/></div>
+        <div class="fg"><div class="fl">Microsoft 365 PIN</div><input class="fi" id="am-pin" value="${esc(a?.microsoft_365_pin||'')}"/></div>
+      </div>
       <div class="fg"><div class="fl">Proprietà</div>
         <select class="fse" id="am-property" onchange="document.getElementById('am-rent-wrap').style.display=this.value==='rent'?'':'none'">
           <option value="owned"${propVal==='owned'?' selected':''}>Di proprietà</option>
@@ -1494,15 +1519,15 @@ function openAssetModal(a){
       </div>
     </div>
     <div class="fg"><div class="fl">Categoria</div>
-      <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+S.assetSubcat.filter(sc=>sc.categoria_id===this.value).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
+      <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+[...S.assetSubcat.filter(sc=>sc.categoria_id===this.value)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
         <option value="">— Nessuna —</option>
-        ${S.assetCat.map(cat=>`<option value="${cat.id}"${S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id===cat.id?' selected':''}>${esc(cat.icona||'')} ${esc(cat.nome)}</option>`).join('')}
+        ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<option value="${cat.id}"${S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id===cat.id?' selected':''}>${esc(cat.icona||'')} ${esc(cat.nome)}</option>`).join('')}
       </select>
     </div>
     <div class="fg"><div class="fl">Sottocategoria</div>
       <select class="fse" id="am-sub">
         <option value="">— Nessuna —</option>
-        ${(()=>{const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';return S.assetSubcat.filter(sc=>!catId||sc.categoria_id===catId).map(sc=>`<option value="${sc.id}"${sc.id===a?.sottocategoria_id?' selected':''}>${esc(sc.nome)}</option>`).join('');})()}
+        ${(()=>{const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';return [...S.assetSubcat.filter(sc=>!catId||sc.categoria_id===catId)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>`<option value="${sc.id}"${sc.id===a?.sottocategoria_id?' selected':''}>${esc(sc.nome)}</option>`).join('');})()}
       </select>
     </div>
     <div class="fg"><div class="fl">Note</div><textarea class="fta" id="am-note">${esc(a?.note||'')}</textarea></div>`;
@@ -1526,6 +1551,7 @@ function openAssetModal(a){
           mac_address:$('am-mac').value.trim()||null,
           anydesk:$('am-anydesk').value.trim()||null,
           microsoft_365_user:$('am-m365').value.trim()||null,
+          microsoft_365_pin:$('am-pin').value.trim()||null,
           property,
           noleggiatore_id:property==='rent'?($('am-nol').value||null):null,
           rental_start:property==='rent'?($('am-rstart').value||null):null,
