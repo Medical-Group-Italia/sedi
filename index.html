@@ -76,7 +76,7 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 /* ── Badges ── */
 .bg{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
 .bg-on{background:var(--green-light);color:#1A7A40}.bg-off{background:var(--g100);color:var(--g500)}
-.bg-adm{background:var(--navy);color:#fff}.bg-usr{background:var(--g100);color:var(--g700)}.bg-asset{background:#EEF5E3;color:#4a6b20}
+.bg-adm{background:var(--navy);color:#fff}.bg-usr{background:var(--g100);color:var(--g700)}.bg-asset{background:#EEF5E3;color:#4a6b20}.bg-it{background:#DBEAFE;color:#1D4ED8}
 
 /* ── Forms ── */
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -297,25 +297,25 @@ const S = {
    NAV
 ══════════════════════════════════════════ */
 const NAV_MAIN = [
-  {id:'griglia',    l:'Informazioni', ic:'', r:['admin','utente']},
-  {id:'mappa',      l:'Mappa',        ic:'', r:['admin','utente']},
-  {id:'asset',      l:'Asset',        ic:'', r:['admin','utente','asset']},
+  {id:'griglia',    l:'Informazioni', ic:'', r:['admin','utente','it']},
+  {id:'mappa',      l:'Mappa',        ic:'', r:['admin','utente','it']},
+  {id:'asset',      l:'Asset',        ic:'', r:['admin','utente','asset','it']},
   {id:'costi_ric',  l:'Costi',        ic:'', r:['admin','utente','asset']},
   {id:'verifiche',  l:'Verifiche',    ic:'', r:['admin','utente','asset']},
   {id:'convenzioni',l:'Convenzioni',  ic:'', r:['admin','utente','asset']},
   {id:'impianti',   l:'Impianti',     ic:'', r:['admin','utente','asset']},
 ];
 const NAV_ADMIN = [
-  {id:'sedi',       l:'Sedi',              ic:''},
-  {id:'ragioni',    l:'Ragioni sociali',   ic:''},
-  {id:'aree',       l:'Aree geografiche',  ic:''},
-  {id:'fornitori',  l:'Fornitori',         ic:''},
-  {id:'produttori',  l:'Produttori asset',  ic:''},
-  {id:'noleggiatori',l:'Noleggiatori asset', ic:''},
-  {id:'struttura',  l:'Struttura',         ic:''},
-  {id:'asset_cat',  l:'Asset: categorie',  ic:''},
-  {id:'utenti',     l:'Utenti',            ic:''},
-  {id:'log',        l:'Log',               ic:''},
+  {id:'sedi',        l:'Sedi',                ic:'', r:['admin']},
+  {id:'ragioni',     l:'Ragioni sociali',     ic:'', r:['admin']},
+  {id:'aree',        l:'Aree geografiche',    ic:'', r:['admin']},
+  {id:'fornitori',   l:'Fornitori',           ic:'', r:['admin']},
+  {id:'struttura',   l:'Struttura',           ic:'', r:['admin','it']},
+  {id:'asset_cat',   l:'Asset: categorie',    ic:'', r:['admin','it']},
+  {id:'produttori',  l:'Asset: produttori',   ic:'', r:['admin','it']},
+  {id:'noleggiatori',l:'Asset: noleggiatori', ic:'', r:['admin','it']},
+  {id:'utenti',      l:'Utenti',              ic:'', r:['admin','it']},
+  {id:'log',         l:'Log',                 ic:'', r:['admin','it']},
 ];
 // compatibilità con codice che usa NAV
 const NAV = [...NAV_MAIN, ...NAV_ADMIN.map(n=>({...n,r:['admin']}))];
@@ -500,7 +500,7 @@ function renderSidebar(){
         <span>⚙</span>Admin<span style="font-size:9px;margin-left:2px">▼</span>
       </button>
       <div class="tnb-dropdown hid" id="admin-dd">
-        ${NAV_ADMIN.map(n=>`<button class="tnb-dd-item${S.page===n.id?' active':''}" data-pg="${n.id}"><span>${n.ic}</span>${n.l}</button>`).join('')}
+        ${NAV_ADMIN.filter(n=>!n.r||n.r.includes(ruolo)).map(n=>`<button class="tnb-dd-item${S.page===n.id?' active':''}" data-pg="${n.id}"><span>${n.ic}</span>${n.l}</button>`).join('')}
       </div>
     </div>`:'';
   $('tb-nav').innerHTML=mainItems.map(n=>`
@@ -517,8 +517,8 @@ function renderSidebar(){
   });
   document.addEventListener('click',()=>$('admin-dd')?.classList.add('hid'),{once:true});
   $('tb-user').textContent=S.user?`${S.user.nome} ${S.user.cognome}`:'';
-  const rb={'admin':'bg-adm','utente':'bg-usr','asset':'bg-asset'};
-  const rl={'admin':'Admin','utente':'Utente','asset':'Asset'};
+  const rb={'admin':'bg-adm','utente':'bg-usr','asset':'bg-asset','it':'bg-it'};
+  const rl={'admin':'Admin','utente':'Utente','asset':'Asset','it':'IT'};
   $('tb-role').innerHTML=S.user?`<span class="bg ${rb[ruolo]||'bg-usr'}">${rl[ruolo]||ruolo}</span>`:'';
 }
 function goPage(pg){
@@ -1212,7 +1212,7 @@ function ragioneNome(id){ return S.ragioni.find(r=>r.id===id)?.nome||'—'; }
    PAGINA ASSET
 ══════════════════════════════════════════ */
 function renderAsset(pb){
-  if(!S.asset_filter) S.asset_filter={search:'',catId:'',subcatId:'',sedeId:'',_focus:null};
+  if(!S.asset_filter) S.asset_filter={search:'',catId:S.user?.ruolo==='it'?'cce7f33a-80d0-4b03-bf27-aefca23f9922':'',subcatId:'',sedeId:'',_focus:null};
   const f=S.asset_filter;
   const oggi2=new Date().toISOString().slice(0,10);
   let lista=S.asset.filter(a=>{
@@ -1289,7 +1289,7 @@ function renderAsset(pb){
 function buildAssetTableHTML(lista){
   if(!lista.length) return `<div class="emp"><div class="emi">🔧</div><div class="emt">Nessun asset trovato</div></div>`;
   const oggi=new Date().toISOString().slice(0,10);
-  return `<table class="dt"><thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Sede attuale</th><th>Costi</th><th>Azioni</th></tr></thead><tbody>
+  return `<table class="dt"><thead><tr><th>Codice</th><th>Nome</th><th>Categoria</th><th>Assegnazione</th><th>Costi</th><th>Azioni</th></tr></thead><tbody>
   ${lista.map(a=>{
     const ub=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
     const costiA=S.costi.filter(x=>x.asset_id===a.id).length;
@@ -1303,7 +1303,11 @@ function buildAssetTableHTML(lista){
         <div class="ts">${[a.produttore_id?S.assetProduttori.find(p=>p.id===a.produttore_id)?.nome:a.marca,a.modello,a.seriale,a.anno?'Anno '+a.anno:''].filter(Boolean).join(' · ')}</div>
       </td>
       <td><span style="font-size:12px">${esc(assetNomeCategoria(a.id))}</span></td>
-      <td>${ub?`<span class="bg bg-on">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>'}</td>
+      <td>${(()=>{
+        const au=S.assetUtenti?.filter(x=>x.asset_id===a.id&&!x.data_a)[0];
+        if(au){const u=S.profili.find(p=>p.id===au.utente_id);return u?`<span class="bg bg-it" style="font-size:11px">${esc(u.cognome+' '+u.nome)}</span>`:'<span class="bg bg-usr">Utente</span>';}
+        return ub?`<span class="bg bg-on">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>';
+      })()}</td>
       <td>${costiA?`<span class="bg" style="background:var(--blue-xlight);color:var(--navy)">${costiA} costi</span>`:'—'}</td>
       <td><div class="tda">
         ${(()=>{
@@ -1438,7 +1442,11 @@ function openAssetModal(a){
       <div class="fg"><div class="fl">Produttore</div>
         <select class="fse" id="am-prod">
           <option value="">— Nessuno —</option>
-          ${S.assetProduttori.map(p=>`<option value="${p.id}"${a?.produttore_id===p.id?' selected':''}>${esc(p.nome)}</option>`).join('')}
+          ${S.assetProduttori.filter(p=>{
+            const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';
+            if(!p.categorie_ids||!p.categorie_ids.length) return true;
+            return !catId||p.categorie_ids.includes(catId);
+          }).map(p=>`<option value="${p.id}"${a?.produttore_id===p.id?' selected':''}>${esc(p.nome)}</option>`).join('')}
         </select></div>
       <div class="fg"><div class="fl">Marca (testo libero)</div><input class="fi" id="am-marca" value="${esc(a?.marca||'')}"/></div>
     </div>
@@ -2625,12 +2633,18 @@ function renderProduttori(pb){
   }));
 }
 function openProduttoreModal(p){
+  const catSelIds=(p?.categorie_ids||[]);
   openM(p?'✏ Modifica produttore':'+ Nuovo produttore',`
     <div class="fg"><div class="fl">Nome *</div><input class="fi" id="pm-nome" value="${esc(p?.nome||'')}"/></div>
-    <div class="fg"><div class="fl">Note</div><textarea class="fta" id="pm-note">${esc(p?.note||'')}</textarea></div>`,
+    <div class="fg"><div class="fl">Note</div><textarea class="fta" id="pm-note">${esc(p?.note||'')}</textarea></div>
+    <div class="fg"><div class="fl">Categorie asset (lascia tutto deselezionato = tutte le categorie)</div>
+      <div class="fch" id="pm-cats">
+        ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<label class="fci"><input type="checkbox" value="${cat.id}"${catSelIds.includes(cat.id)?' checked':''}> ${esc(cat.icona||'')} ${esc(cat.nome)}</label>`).join('')}
+      </div></div>`,
   [{l:'Annulla',c:'bs',a:closeM},{l:'Salva',c:'bpg',a:async()=>{
     const nome=$('pm-nome').value.trim(); if(!nome){toast('Nome obbligatorio','err');return;}
-    const payload={nome,note:$('pm-note').value.trim()||null};
+    const cats=[...document.querySelectorAll('#pm-cats input:checked')].map(x=>x.value);
+    const payload={nome,note:$('pm-note').value.trim()||null,categorie_ids:cats.length?cats:null};
     if(p){await db('PATCH',T('asset_produttori'),{flt:`id=eq.${p.id}`,body:payload});S.assetProduttori=S.assetProduttori.map(x=>x.id===p.id?{...x,...payload}:x);}
     else{const[np]=await db('POST',T('asset_produttori'),{body:payload});S.assetProduttori.push(np);}
     closeM();renderPage();toast(p?'Aggiornato':'Aggiunto ✅');
@@ -3420,7 +3434,7 @@ const PWD_WARN_HTML='<div style="margin-top:6px;padding:8px 12px;border-radius:v
 function renderUtentiTable(list,pb){
   const el=document.getElementById('u-table-wrap');if(!el)return;
   if(!list.length){el.innerHTML='<div class="emp"><div class="emi">👥</div><div class="emt">Nessun utente trovato</div></div>';return;}
-  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente']};
+  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT']};
   el.innerHTML=`<table class="dt"><thead><tr><th>Utente</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
   ${list.map(u=>{const[rc,rl]=RBADGE[u.ruolo]||['bg-usr',u.ruolo];return`<tr>
     <td><div class="tn">${esc(u.cognome+' '+u.nome)}</div><div class="ts">${esc(u.email||'')}</div></td>
@@ -3479,6 +3493,7 @@ function openUtenteModal(u){
     <div class="fg"><div class="fl">Ruolo</div><select class="fse" id="um-ruolo">
       <option value="utente"${u?.ruolo==='utente'?' selected':''}>Utente (solo lettura)</option>
       <option value="asset"${u?.ruolo==='asset'?' selected':''}>Asset (asset, costi, fornitori)</option>
+      <option value="it"${u?.ruolo==='it'?' selected':''}>IT (gestione IT)</option>
       <option value="admin"${u?.ruolo==='admin'?' selected':''}>Admin (accesso completo)</option>
     </select></div>
     <div class="fg"><label class="tw">
