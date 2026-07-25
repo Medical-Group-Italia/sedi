@@ -1221,7 +1221,10 @@ function renderAsset(pb){
       const au2=S.assetUtenti?.filter(x=>x.asset_id===a.id&&!x.data_a)[0];
       const utente2=au2?S.profili.find(p=>p.id===au2.utente_id):null;
       const uNome2=utente2?`${utente2.cognome} ${utente2.nome}`:'';
-      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.seriale||''} ${a.note||''} ${uNome2}`.toLowerCase().includes(q)) return false;
+      const prod2=a.produttore_id?S.assetProduttori.find(p=>p.id===a.produttore_id)?.nome||'':'';
+      const ub2=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi2&&(!x.data_a||x.data_a>=oggi2)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
+      const sedeName2=ub2?S.sedi.find(s=>s.id===ub2.sede_id)?.nome||'':'';
+      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.modello||''} ${a.seriale||''} ${prod2} ${sedeName2} ${uNome2} ${a.note||''}`.toLowerCase().includes(q)) return false;
     }
     if(f.catId||f.subcatId){
       const sc=S.assetSubcat.find(x=>x.id===a.sottocategoria_id);
@@ -1339,7 +1342,13 @@ function renderAssetTable(){
   const lista=S.asset.filter(a=>{
     if(f.search){
       const q=f.search.toLowerCase();
-      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.seriale||''} ${a.note||''}`.toLowerCase().includes(q)) return false;
+      const au=S.assetUtenti?.filter(x=>x.asset_id===a.id&&!x.data_a)[0];
+      const utente=au?S.profili.find(p=>p.id===au.utente_id):null;
+      const uNome=utente?`${utente.cognome} ${utente.nome}`:'';
+      const prod=a.produttore_id?S.assetProduttori.find(p=>p.id===a.produttore_id)?.nome||'':'';
+      const ub=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
+      const sedeName=ub?S.sedi.find(s=>s.id===ub.sede_id)?.nome||'':'';
+      if(!`${a.codice||''} ${a.nome} ${a.marca||''} ${a.modello||''} ${a.seriale||''} ${prod} ${sedeName} ${uNome} ${a.note||''}`.toLowerCase().includes(q)) return false;
     }
     if(f.catId||f.subcatId){
       const sc=S.assetSubcat.find(x=>x.id===a.sottocategoria_id);
