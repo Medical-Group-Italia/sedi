@@ -2604,24 +2604,36 @@ async function openAssetUtenteModal(assetId){
    PAGINA PRODUTTORI ASSET
 ══════════════════════════════════════════ */
 function renderProduttori(pb){
-  const isAdm=['admin','asset'].includes(S.user?.ruolo);
+  const isAdm=['admin','asset','it'].includes(S.user?.ruolo);
+  if(!S._prodF) S._prodF={search:''};
+  const f=S._prodF;
+  const lista=[...S.assetProduttori].filter(p=>!f.search||p.nome.toLowerCase().includes(f.search.toLowerCase())).sort((a,b)=>a.nome.localeCompare(b.nome));
   pb.innerHTML=`<div class="fian"><div class="card">
-    <div class="ch"><span class="ct">Produttori asset (${S.assetProduttori.length})</span>
+    <div class="ch">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ct">Asset: produttori (${lista.length}/${S.assetProduttori.length})</span>
+        <input class="fi-sm" id="prod-search" style="width:200px" placeholder="🔍 Cerca…" value="${esc(f.search)}"/>
+      </div>
       ${isAdm?`<button class="btn bpg bsm" id="prod-add">+ Nuovo</button>`:''}
     </div>
-    ${!S.assetProduttori.length?`<div class="emp"><div class="emi">🏭</div><div class="emt">Nessun produttore</div></div>`:
-    `<table class="dt"><thead><tr><th>Nome</th><th>Note</th><th>Asset</th><th>Azioni</th></tr></thead><tbody>
-    ${S.assetProduttori.map(p=>`<tr>
-      <td class="tn">${esc(p.nome)}</td>
-      <td style="font-size:12px;color:var(--g500)">${esc(p.note||'')}</td>
-      <td><span class="bg bg-usr">${S.asset.filter(a=>a.produttore_id===p.id).length} asset</span></td>
-      <td><div class="tda">
-        <button class="btn bs bsm" data-prode="${p.id}">✏</button>
-        <button class="btn bd bsm" data-prodd="${p.id}">🗑</button>
-      </div></td>
-    </tr>`).join('')}
+    ${!lista.length?`<div class="emp"><div class="emi">🏭</div><div class="emt">${S.assetProduttori.length?'Nessun risultato':'Nessun produttore'}</div></div>`:
+    `<table class="dt"><thead><tr><th>Nome</th><th>Categorie</th><th>Note</th><th>Asset</th>${isAdm?'<th>Azioni</th>':''}</tr></thead><tbody>
+    ${lista.map(p=>{
+      const catNames=(p.categorie_ids&&p.categorie_ids.length)?p.categorie_ids.map(cid=>S.assetCat.find(c=>c.id===cid)?.nome).filter(Boolean).join(', '):'Tutte';
+      return `<tr>
+        <td class="tn">${esc(p.nome)}</td>
+        <td style="font-size:12px;color:var(--g500)">${esc(catNames)}</td>
+        <td style="font-size:12px;color:var(--g500)">${esc(p.note||'')}</td>
+        <td><span class="bg bg-usr">${S.asset.filter(a=>a.produttore_id===p.id).length} asset</span></td>
+        ${isAdm?`<td><div class="tda">
+          <button class="btn bs bsm" data-prode="${p.id}">✏</button>
+          <button class="btn bd bsm" data-prodd="${p.id}">🗑</button>
+        </div></td>`:''}
+      </tr>`;
+    }).join('')}
     </tbody></table>`}
   </div></div>`;
+  $('prod-search').addEventListener('input',e=>{f.search=e.target.value;renderProduttori(pb);});
   $('prod-add')?.addEventListener('click',()=>openProduttoreModal(null));
   pb.querySelectorAll('[data-prode]').forEach(b=>b.addEventListener('click',()=>openProduttoreModal(S.assetProduttori.find(x=>x.id===b.dataset.prode))));
   pb.querySelectorAll('[data-prodd]').forEach(b=>b.addEventListener('click',()=>{
@@ -2637,18 +2649,35 @@ function openProduttoreModal(p){
   openM(p?'✏ Modifica produttore':'+ Nuovo produttore',`
     <div class="fg"><div class="fl">Nome *</div><input class="fi" id="pm-nome" value="${esc(p?.nome||'')}"/></div>
     <div class="fg"><div class="fl">Note</div><textarea class="fta" id="pm-note">${esc(p?.note||'')}</textarea></div>
-    <div class="fg"><div class="fl">Categorie asset (lascia tutto deselezionato = tutte le categorie)</div>
-      <div class="fch" id="pm-cats">
-        ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<label class="fci"><input type="checkbox" value="${cat.id}"${catSelIds.includes(cat.id)?' checked':''}> ${esc(cat.icona||'')} ${esc(cat.nome)}</label>`).join('')}
+    <div class="fg"><div class="fl">Categorie asset associate <span style="font-weight:400;font-size:11px;color:var(--g500)">(nessuna selezionata = tutte)</span></div>
+      <div id="pm-cats" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+        ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>{
+          const sel=catSelIds.includes(cat.id);
+          return `<button type="button" data-catid="${cat.id}" class="pm-cat-tag" style="padding:5px 12px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer;border:1.5px solid ${sel?'var(--verde)':'var(--g200)'};background:${sel?'var(--blue-xlight)':'#fff'};color:${sel?'var(--verde)':'var(--g500)'};font-weight:${sel?'700':'400'}">${esc(cat.nome)}</button>`;
+        }).join('')}
       </div></div>`,
   [{l:'Annulla',c:'bs',a:closeM},{l:'Salva',c:'bpg',a:async()=>{
     const nome=$('pm-nome').value.trim(); if(!nome){toast('Nome obbligatorio','err');return;}
-    const cats=[...document.querySelectorAll('#pm-cats input:checked')].map(x=>x.value);
+    const cats=[...document.querySelectorAll('.pm-cat-tag[data-selected="1"]')].map(x=>x.dataset.catid);
     const payload={nome,note:$('pm-note').value.trim()||null,categorie_ids:cats.length?cats:null};
     if(p){await db('PATCH',T('asset_produttori'),{flt:`id=eq.${p.id}`,body:payload});S.assetProduttori=S.assetProduttori.map(x=>x.id===p.id?{...x,...payload}:x);}
     else{const[np]=await db('POST',T('asset_produttori'),{body:payload});S.assetProduttori.push(np);}
     closeM();renderPage();toast(p?'Aggiornato':'Aggiunto ✅');
   }}]);
+  // Toggle tag selection
+  setTimeout(()=>{
+    document.querySelectorAll('.pm-cat-tag').forEach(btn=>{
+      if(catSelIds.includes(btn.dataset.catid)) btn.dataset.selected='1';
+      btn.addEventListener('click',()=>{
+        const sel=btn.dataset.selected==='1';
+        btn.dataset.selected=sel?'0':'1';
+        btn.style.border=sel?'1.5px solid var(--g200)':'1.5px solid var(--verde)';
+        btn.style.background=sel?'#fff':'var(--blue-xlight)';
+        btn.style.color=sel?'var(--g500)':'var(--verde)';
+        btn.style.fontWeight=sel?'400':'700';
+      });
+    });
+  },50);
 }
 
 /* ══════════════════════════════════════════
@@ -3462,17 +3491,41 @@ function renderUtentiTable(list,pb){
 
 function renderUtenti(pb){
   pb.innerHTML=`<div class="fian"><div class="card">
-    <div class="ch"><span class="ct">&#128101; Utenti (${S.profili.length})</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input class="fi-sm" id="u-search" style="width:200px" placeholder="&#128269; Cerca&hellip;"/>
+    <div class="ch"><span class="ct">👥 Utenti (${S.profili.length})</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="fi-sm" id="u-search" style="width:200px" placeholder="🔍 Cerca nome, cognome, email…"/>
+        <select class="fi-sm" id="u-ruolo">
+          <option value="">Tutti i ruoli</option>
+          <option value="admin">Admin</option>
+          <option value="it">IT</option>
+          <option value="asset">Asset</option>
+          <option value="utente">Utente</option>
+        </select>
+        <select class="fi-sm" id="u-stato">
+          <option value="">Tutti gli stati</option>
+          <option value="1">Attivi</option>
+          <option value="0">Disattivati</option>
+        </select>
         <button class="btn bpg bsm" id="u-add">+ Nuovo utente</button>
       </div>
     </div>
     <div id="u-table-wrap"></div>
   </div></div>`;
-  const render=q=>{const fl=(S.profili||[]).filter(u=>`${u.cognome} ${u.nome} ${u.email}`.toLowerCase().includes((q||'').toLowerCase()));renderUtentiTable(fl,pb);};
-  render('');
-  document.getElementById('u-search').addEventListener('input',e=>render(e.target.value));
+  const render=()=>{
+    const q=($('u-search').value||'').toLowerCase();
+    const ruoloF=$('u-ruolo').value;
+    const statoF=$('u-stato').value;
+    const fl=[...S.profili]
+      .filter(u=>!q||`${u.cognome} ${u.nome} ${u.email}`.toLowerCase().includes(q))
+      .filter(u=>!ruoloF||u.ruolo===ruoloF)
+      .filter(u=>statoF===''||(statoF==='1'?u.attivo!==false:u.attivo===false))
+      .sort((a,b)=>a.cognome.localeCompare(b.cognome));
+    renderUtentiTable(fl,pb);
+  };
+  render();
+  $('u-search').addEventListener('input',render);
+  $('u-ruolo').addEventListener('change',render);
+  $('u-stato').addEventListener('change',render);
   document.getElementById('u-add').addEventListener('click',()=>openUtenteModal(null));
 }
 
