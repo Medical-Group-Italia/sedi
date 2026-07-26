@@ -361,7 +361,7 @@ const NAV = [...NAV_MAIN, ...NAV_ADMIN.map(n=>({...n,r:['admin']}))];
    UTILITIES
 ══════════════════════════════════════════ */
 const $   = id => document.getElementById(id);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\$\{/g,'&#36;{');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\x60/g,'&#96;').replace(/\$\{/g,'&#36;{');
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,11));
 
 function fmt(d){
@@ -3310,6 +3310,14 @@ function renderMappaPannello(){
     mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
       pin.setAttribute('draggable','true');
       pin.addEventListener('dragstart',e=>{
+        const img=mpBody.querySelector('#mappa-img');
+        if(img){
+          const r=img.getBoundingClientRect();
+          const pid=pin.dataset.pid,aid=pin.dataset.aid;
+          const pos=S.assetMappe.find(p=>p.id===pid);
+          if(pos) _dragOffset={ox:e.clientX-r.left-(pos.x/100*r.width), oy:e.clientY-r.top-(pos.y/100*r.height)};
+          else _dragOffset={ox:0,oy:0};
+        }
         pin.dataset.dragging='0';
         e.dataTransfer.setData('text/plain',pin.dataset.pid+'|'+pin.dataset.aid);
         pin.classList.add('dragging');
@@ -3317,20 +3325,28 @@ function renderMappaPannello(){
       pin.addEventListener('dragend',()=>{pin.classList.remove('dragging');});
     });
 
-    {
-
-  // Drag & drop testi
+  // Drag & drop testi e pin: salva offset punto di presa
   if(canEdit){
     mpBody.querySelectorAll('.mappa-text').forEach(el=>{
       el.setAttribute('draggable','true');
       el.addEventListener('dragstart',e=>{
+        const img=mpBody.querySelector('#mappa-img');
+        if(img){
+          const r=img.getBoundingClientRect();
+          _dragOffset={ox:((e.clientX-r.left)/r.width)*100, oy:((e.clientY-r.top)/r.height)*100};
+          const t=S.mappeTesti.find(x=>x.id===el.dataset.tid);
+          if(t) _dragOffset={ox:e.clientX-r.left-(t.x/100*r.width), oy:e.clientY-r.top-(t.y/100*r.height)};
+          else _dragOffset={ox:0,oy:0};
+        }
         e.dataTransfer.setData('text/plain','TEXT|'+el.dataset.tid);
         el.classList.add('dragging');
       });
       el.addEventListener('dragend',()=>el.classList.remove('dragging'));
     });
-  }
 
+
+  // Helper coordinate precise su immagine (considera scroll del pannello)
+  const getImgCoords=(evt,img)=>{const r=img.getBoundingClientRect();return {x:Math.min(100,Math.max(0,((evt.clientX-r.left)/r.width)*100)),y:Math.min(100,Math.max(0,((evt.clientY-r.top)/r.height)*100))};};let _dragOffset={ox:0,oy:0};
   // Drag drop su wrap (aggiorna anche testi)
   const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
   const imgDrop=mpBody.querySelector('#mappa-img');
@@ -3340,9 +3356,9 @@ function renderMappaPannello(){
       e.preventDefault();
       const data=e.dataTransfer.getData('text/plain');
       if(!data) return;
-      const rect=imgDrop.getBoundingClientRect();
-      const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
-      const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
+      const rect2=imgDrop.getBoundingClientRect();
+      const x=Math.min(100,Math.max(0,((e.clientX-rect2.left-_dragOffset.ox)/rect2.width)*100));
+      const y=Math.min(100,Math.max(0,((e.clientY-rect2.top-_dragOffset.oy)/rect2.height)*100));
       if(data.startsWith('TEXT|')){
         const tid=data.slice(5);
         await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{x,y}});
@@ -3396,9 +3412,7 @@ function renderMappaPannello(){
     wrapEl.addEventListener('click',async e=>{
       if(e.target.closest('.mappa-pin')||e.target.closest('.mappa-text')||e.target.closest('[data-text-edit]')||e.target.closest('[data-text-del]')) return;
       if(S._mappaPanel._textMode){
-        const rect=imgEl.getBoundingClientRect();
-        const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
-        const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
+        const {x,y}=getImgCoords(e,imgEl);
         const testo=prompt('Testo da inserire:');
         if(!testo) return;
         const dim=prompt('Dimensione font (default 24):','24');
@@ -3445,8 +3459,6 @@ function renderMappaPannello(){
         });
       },50);
     });
-  }
-    }
   }
 }
 
