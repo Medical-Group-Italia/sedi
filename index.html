@@ -494,7 +494,7 @@ function getValore(sedeId,campoId){
 function renderSidebar(){
   const ruolo=S.user?.ruolo;
   const mainItems=NAV_MAIN.filter(n=>!n.r||n.r.includes(ruolo));
-  const adminDropdown=ruolo==='admin'?`
+  const adminDropdown=(ruolo==='admin'||ruolo==='it')?`
     <div class="tnb-wrap" id="admin-wrap">
       <button class="tnb${NAV_ADMIN.some(n=>n.id===S.page)?' active':''}" id="admin-btn">
         <span>⚙</span>Admin<span style="font-size:9px;margin-left:2px">▼</span>
