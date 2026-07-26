@@ -349,7 +349,7 @@ const NAV_ADMIN = [
   {id:'utenti',      l:'Utenti',              ic:'', r:['admin','it']},
   {id:'log',         l:'Log',                 ic:'', r:['admin','it']},
 ];
-// compatibilità con codice che usa NAV
+// compatibilit- con codice che usa NAV
 const NAV = [...NAV_MAIN, ...NAV_ADMIN.map(n=>({...n,r:['admin']}))];
 
 /* UTILITIES */
@@ -500,7 +500,7 @@ async function loadAll(){
 }
 
 
-// Restituisce le sedi attive ordinate per: ordine area → ordine sede → nome sede
+// Restituisce le sedi attive ordinate per: ordine area - ordine sede - nome sede
 function sediOrdinate(filtra=null){
   const areeOrd=[...S.aree].sort((a,b)=>(a.ordine||0)-(b.ordine||0));
   const areeMap={}; areeOrd.forEach((a,i)=>areeMap[a.id]=i);
@@ -762,7 +762,7 @@ function buildMultiSel(id,selIds,onChange){
       `).join('')}
     </div>`;
 
-  // toggle dropdown — si chiude solo cliccando fuori
+  // toggle dropdown - si chiude solo cliccando fuori
   wrapper.querySelector(`#ms-btn-${id}`).addEventListener('click',e=>{
     e.stopPropagation();
     const dd=wrapper.querySelector(`#ms-dd-${id}`);
@@ -1944,7 +1944,7 @@ function scadenzaBadge(giorni){
 }
 
 /* PAGINA VERIFICHE */
-/* ALERT EMAIL — HELPERS */
+/* ALERT EMAIL - HELPERS */
 function getCfg(tipo, refId){
   return S.alertCfg.find(c=>c.tipo===tipo&&c.ref_id===refId)||null;
 }
@@ -2227,10 +2227,10 @@ function openVerificaModal(v){
     });
     inp.addEventListener('blur',()=>setTimeout(()=>{res.style.display='none';},250));
     inp.addEventListener('focus',()=>{
-      // Al refocus mostra tutti gli asset (o filtrati se l'utente ha già scritto qualcosa di proprio)
+      // Al refocus mostra tutti gli asset (o filtrati se l'utente ha gi- scritto qualcosa di proprio)
       showMatches(hid.value?'':inp.value);
     });
-    // TEST button (solo se esiste già una config)
+    // TEST button (solo se esiste gi- una config)
     const testBtn=$('al-test');
     if(testBtn&&!testBtn.disabled) testBtn.addEventListener('click',()=>sendTestAlert('verifica',v.id));
   },50);
@@ -2357,7 +2357,7 @@ function renderImpianti(pb){
   if(!S.impf) S.impf={search:'',sort:'giorni',sedeId:''};
   const f=S.impf;
 
-  // Arricchisci impianti con la scadenza più vicina
+  // Arricchisci impianti con la scadenza pi- vicina
   let lista=S.impianti.map(imp=>{
     const scadenze=S.impiantiScadenze.filter(s=>s.impianto_id===imp.id);
     const prossima=scadenze
@@ -2559,7 +2559,7 @@ async function openImpiantoModal(imp){
         bindScadenze();
       });
     });
-    // TEST buttons per scadenze già salvate
+    // TEST buttons per scadenze gi- salvate
     document.querySelectorAll('[data-test-sc]').forEach((b,bi)=>{
       b.addEventListener('click',async()=>{
         const scId=b.dataset.testSc;
@@ -3075,11 +3075,11 @@ function initMappaPanel(){
   if(!tab||!panel||panel._init) return;
   panel._init=true;
 
-  // Listener tab e close — funzionano subito
+  // Listener tab e close - funzionano subito
   tab.addEventListener('click',()=>toggleMappaPanel());
   document.getElementById('mp-close')?.addEventListener('click',()=>toggleMappaPanel(false));
 
-  // Listener sede/mappa — usa handler che accede a S.sedi al momento del click
+  // Listener sede/mappa - usa handler che accede a S.sedi al momento del click
   const mpSede=document.getElementById('mp-sede');
   const mpMappa=document.getElementById('mp-mappa');
 
@@ -3235,7 +3235,7 @@ function renderMappaPannello(){
     if(hlPin) setTimeout(()=>hlPin.scrollIntoView({block:'center',inline:'center'}),100);
   }
 
-  // Click su ✕ rimozione
+  // Click su - rimozione
   mpBody.querySelectorAll('[data-remove-pid]').forEach(btn=>{
     btn.addEventListener('click',async e=>{
       e.stopPropagation();
@@ -3248,7 +3248,7 @@ function renderMappaPannello(){
       });
     });
   });
-  // Click su etichetta → apri modale asset
+  // Click su etichetta - apri modale asset
   mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
     pin.addEventListener('click',e=>{
       if(e.target.closest('[data-remove-pid]')) return;
@@ -3357,7 +3357,7 @@ function renderMappaPannello(){
     });
   }
 
-  // Click mappa per aggiungere testo (modalità testo)
+  // Click mappa per aggiungere testo (modalit- testo)
   const wrapEl=mpBody.querySelector('#mappa-img-wrap');
   const imgEl=mpBody.querySelector('#mappa-img');
   if(wrapEl&&imgEl&&canEdit){
@@ -3373,7 +3373,7 @@ function renderMappaPannello(){
         renderMappaPannello();
         return;
       }
-      // Modalità posizionamento asset
+      // Modalit- posizionamento asset
       if(!S._mappaPanel._placeMode) return;
       const rect=imgEl.getBoundingClientRect();
       const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
@@ -3411,6 +3411,8 @@ function renderMappaPannello(){
         });
       },50);
     });
+  }
+  }
   }
 }
 
@@ -3470,9 +3472,9 @@ async function openMappaModal(m){
     </div>
     <div class="fg"><div class="fl">Immagine planimetria (JPG/PNG)</div>
       <input type="file" class="fi" id="mm-img" accept="image/* " style="padding:6px"/>
-      ${m?.immagine_url?`<div style="font-size:12px;color:var(--g500);margin-top:4px">Immagine attuale: <a href="${esc(m.immagine_url)}" target="_blank" style="color:var(--verde)">visualizza</a> — carica un nuovo file per sostituirla</div>`:''}
+      ${m?.immagine_url?`<div style="font-size:12px;color:var(--g500);margin-top:4px">Immagine attuale: <a href="${esc(m.immagine_url)}" target="_blank" style="color:var(--verde)">visualizza</a> - carica un nuovo file per sostituirla</div>`:''}
     </div>`;
-  openM(m?'✏ Modifica mappa':'+ Nuova mappa',body,[
+  openM(m?'- Modifica mappa':'+ Nuova mappa',body,[
     {l:'Annulla',c:'bs',a:closeM},
     {l:'Salva',c:'bpg',a:async()=>{
       const sede=$('mm-sede').value,nome=$('mm-nome').value.trim();
@@ -3503,7 +3505,7 @@ async function openMappaModal(m){
           const [nm]=await db('POST',T('mappe'),{body:payload});
           S.mappe.push(nm);
         }
-        closeM(); renderPage(); toast(m?'Mappa aggiornata':'Mappa aggiunta ✅');
+        closeM(); renderPage(); toast(m?'Mappa aggiornata':'Mappa aggiunta -');
       }catch(e){toast(e.message,'err');}
     }},
   ]);
@@ -3514,13 +3516,13 @@ function renderSediPage(pb){
   const perArea={};
   const sediOrd=[...S.sedi].sort((a,b)=>(a.ordine||0)-(b.ordine||0)||(a.nome||'').localeCompare(b.nome||''));
   sediOrd.forEach(s=>{
-    const area=S.aree.find(a=>a.id===s.area_id)?.nome||'— Nessuna area';
+    const area=S.aree.find(a=>a.id===s.area_id)?.nome||'- Nessuna area';
     if(!perArea[area]) perArea[area]=[];
     perArea[area].push(s);
   });
   // ordina aree per ordine dell'area
   const areeOrd=[...S.aree].sort((a,b)=>(a.ordine||0)-(b.ordine||0));
-  const areeKeys=[...areeOrd.map(a=>a.nome),'— Nessuna area'].filter(k=>perArea[k]);
+  const areeKeys=[...areeOrd.map(a=>a.nome),'- Nessuna area'].filter(k=>perArea[k]);
 
   let tablesHTML='';
   areeKeys.forEach(area=>{
@@ -3528,21 +3530,21 @@ function renderSediPage(pb){
     tablesHTML+=`
     <div class="card" style="margin-bottom:16px">
       <div class="ch" style="background:var(--g50)">
-        <span style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">📍 ${esc(area)}</span>
-        <span style="font-size:11px;color:var(--g400)">↕ trascina per riordinare</span>
+        <span style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px">- ${esc(area)}</span>
+        <span style="font-size:11px;color:var(--g400)">- trascina per riordinare</span>
       </div>
       <table class="dt"><thead><tr><th style="width:30px"></th><th>Nome</th><th>Ragione sociale</th><th>Indirizzo</th><th>Coord.</th><th>Stato</th><th>Azioni</th></tr></thead>
       <tbody class="sortable-area" data-area="${esc(area)}">
         ${sediArea.map(s=>`<tr data-id="${s.id}" style="cursor:grab">
-          <td style="color:var(--g300);font-size:16px;text-align:center">⠿</td>
+          <td style="color:var(--g300);font-size:16px;text-align:center">-</td>
           <td><div class="tn">${esc(s.nome)}</div></td>
-          <td style="font-size:12px;color:var(--g500)">${esc(S.ragioni.find(r=>r.id===s.ragione_sociale_id)?.nome||'—')}</td>
-          <td style="font-size:12px">${esc([s.indirizzo,s.cap,s.citta,s.provincia?`(${s.provincia})`:null].filter(Boolean).join(' ')||'—')}</td>
-          <td>${s.lat&&s.lng?`<span style="font-size:11px;font-family:monospace">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</span>`:'—'}</td>
+          <td style="font-size:12px;color:var(--g500)">${esc(S.ragioni.find(r=>r.id===s.ragione_sociale_id)?.nome||'-')}</td>
+          <td style="font-size:12px">${esc([s.indirizzo,s.cap,s.citta,s.provincia?`(${s.provincia})`:null].filter(Boolean).join(' ')||'-')}</td>
+          <td>${s.lat&&s.lng?`<span style="font-size:11px;font-family:monospace">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</span>`:'-'}</td>
           <td><span class="bg ${s.attiva?'bg-on':'bg-off'}">${s.attiva?'Attiva':'Inattiva'}</span></td>
           <td><div class="tda">
-            <button class="btn bs bsm" data-se="${s.id}">✏</button>
-            <button class="btn bd bsm" data-sd="${s.id}">🗑</button>
+            <button class="btn bs bsm" data-se="${s.id}">-</button>
+            <button class="btn bd bsm" data-sd="${s.id}">-</button>
           </div></td>
         </tr>`).join('')}
       </tbody></table>
@@ -3551,10 +3553,10 @@ function renderSediPage(pb){
 
   pb.innerHTML=`<div class="fian">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <span style="font-size:13px;font-weight:700">📍 Sedi (${S.sedi.length})</span>
+      <span style="font-size:13px;font-weight:700">- Sedi (${S.sedi.length})</span>
       <button class="btn bpg bsm" id="s-add">+ Nuova sede</button>
     </div>
-    ${!S.sedi.length?`<div class="card"><div class="emp"><div class="emi">📍</div><div class="emt">Nessuna sede</div></div></div>`:tablesHTML}
+    ${!S.sedi.length?`<div class="card"><div class="emp"><div class="emi">-</div><div class="emt">Nessuna sede</div></div></div>`:tablesHTML}
   </div>`;
 
   $('s-add')?.addEventListener('click',()=>openSedeModal(null));
@@ -3591,11 +3593,11 @@ async function saveOrder(tbody){
   const area=tbody.dataset.area;
   // trova offset: quante sedi vengono prima in altre aree
   const areeOrd=[...S.aree].sort((a,b)=>(a.ordine||0)-(b.ordine||0));
-  const areeKeys=[...areeOrd.map(a=>a.nome),'— Nessuna area'];
+  const areeKeys=[...areeOrd.map(a=>a.nome),'- Nessuna area'];
   let offset=0;
   for(const k of areeKeys){
     if(k===area) break;
-    offset+=S.sedi.filter(s=>(S.aree.find(a=>a.id===s.area_id)?.nome||'— Nessuna area')===k).length;
+    offset+=S.sedi.filter(s=>(S.aree.find(a=>a.id===s.area_id)?.nome||'- Nessuna area')===k).length;
   }
   for(let i=0;i<rows.length;i++){
     const sid=rows[i].dataset.id;
@@ -3603,7 +3605,7 @@ async function saveOrder(tbody){
     await db('PATCH',T('sedi'),{flt:`id=eq.${sid}`,body:{ordine:newOrd}});
     const s=S.sedi.find(x=>x.id===sid); if(s) s.ordine=newOrd;
   }
-  toast('Ordine salvato ✅');
+  toast('Ordine salvato -');
 }
 
 function openSedeModal(sede){
@@ -3611,19 +3613,19 @@ function openSedeModal(sede){
     <div class="fg"><div class="fl">Nome *</div><input class="fi" id="sm-nome" value="${esc(sede?.nome||'')}"/></div>
     <div class="fg"><div class="fl">Area</div>
       <select class="fse" id="sm-area">
-        <option value="">— Nessuna area —</option>
+        <option value="">- Nessuna area -</option>
         ${S.aree.map(a=>`<option value="${a.id}"${sede?.area_id===a.id?' selected':''}>${esc(a.nome)}</option>`).join('')}
       </select></div>
     <div class="fg"><div class="fl">Ragione sociale</div>
       <select class="fse" id="sm-rag">
-        <option value="">— Nessuna —</option>
+        <option value="">- Nessuna -</option>
         ${S.ragioni.map(r=>`<option value="${r.id}"${sede?.ragione_sociale_id===r.id?' selected':''}>${esc(r.nome)}</option>`).join('')}
       </select></div>
     <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">Indirizzo</div>
     <div class="fg"><div class="fl">Indirizzo (via/piazza)</div><input class="fi" id="sm-ind" value="${esc(sede?.indirizzo||'')}"/></div>
     <div class="fr">
       <div class="fg"><div class="fl">CAP</div><input class="fi" id="sm-cap" value="${esc(sede?.cap||'')}"/></div>
-      <div class="fg" style="flex:2"><div class="fl">Città</div><input class="fi" id="sm-citta" value="${esc(sede?.citta||'')}"/></div>
+      <div class="fg" style="flex:2"><div class="fl">Citt-</div><input class="fi" id="sm-citta" value="${esc(sede?.citta||'')}"/></div>
       <div class="fg"><div class="fl">Prov.</div><input class="fi" id="sm-prov" value="${esc(sede?.provincia||'')}" style="max-width:60px"/></div>
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">Contatti</div>
@@ -3636,19 +3638,19 @@ function openSedeModal(sede){
       <div class="fg"><div class="fl">Latitudine</div><input class="fi" id="sm-lat" type="number" step="0.0001" value="${sede?.lat||''}" placeholder="es. 43.7228"/></div>
       <div class="fg"><div class="fl">Longitudine</div><input class="fi" id="sm-lng" type="number" step="0.0001" value="${sede?.lng||''}" placeholder="es. 10.9021"/></div>
     </div>
-    <div class="alert ai" style="font-size:12px">💡 Le coordinate si trovano su Google Maps: tasto destro sulla sede → "Cosa c'è qui?"</div>
+    <div class="alert ai" style="font-size:12px">- Le coordinate si trovano su Google Maps: tasto destro sulla sede - "Cosa c'- qui?"</div>
     <div class="fg" style="margin-top:12px">
       <label class="tw">
         <div class="tg"><input type="checkbox" id="sm-att" ${sede?.attiva!==false?'checked':''}><span class="tsl"></span></div>
         <span class="fl" style="margin:0">Sede attiva</span>
       </label></div>`;
-  openM(sede?'✏ Modifica sede':'+ Nuova sede',body,[
+  openM(sede?'- Modifica sede':'+ Nuova sede',body,[
     {l:'Annulla',c:'bs',a:closeM},
     {l:'Salva',c:'bpg',a:async()=>{
       const nome=$('sm-nome').value.trim(),area=$('sm-area').value,ind=$('sm-ind').value.trim();
       const lat=parseFloat($('sm-lat').value)||null,lng=parseFloat($('sm-lng').value)||null;
       const attiva=$('sm-att').checked,rag=$('sm-rag').value;
-      if(!nome){toast('Il nome è obbligatorio','err');return;}
+      if(!nome){toast('Il nome - obbligatorio','err');return;}
       try{
         const payload={nome,area_id:area||null,indirizzo:ind||null,
           cap:$('sm-cap').value.trim()||null,
@@ -3664,7 +3666,7 @@ function openSedeModal(sede){
           const [ns]=await db('POST',T('sedi'),{body:payload}); S.sedi.push(ns);
           logAct('sede_create',`Nuova sede: ${nome}`);
         }
-        closeM(); renderPage(); toast(sede?'Sede aggiornata':'Sede aggiunta ✅');
+        closeM(); renderPage(); toast(sede?'Sede aggiornata':'Sede aggiunta -');
         if(S.mappa.leaflet&&!sede) { if(!S.mappa.sediSel.includes(ns?.id)&&ns) S.mappa.sediSel.push(ns.id); updateMapMarkers(); }
       }catch(e){toast(e.message,'err');}
     }},
@@ -4247,7 +4249,7 @@ function openM(title,body,btns=[]){
 }
 function closeM(){
   $('mov').classList.add('hid');
-  // se siamo nella pagina asset e c'è stato un aggiornamento, ri-renderizza
+  // se siamo nella pagina asset e c'- stato un aggiornamento, ri-renderizza
   if(S._assetDirty&&S.page==='asset'){S._assetDirty=false;renderPage();}
 }
 function openConf(msg,onOk){
