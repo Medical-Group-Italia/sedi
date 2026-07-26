@@ -1513,6 +1513,13 @@ async function openCaratteristicheModal(assetId, tipo){
   ]);
 }
 
+function aggiornaSubcat(catId){
+  const sub=document.getElementById('am-sub');
+  if(!sub) return;
+  const scs=[...S.assetSubcat.filter(sc=>sc.categoria_id===catId)].sort((a,b)=>a.nome.localeCompare(b.nome));
+  sub.innerHTML='<option value="">— Nessuna —</option>'+scs.map(sc=>'<option value="'+sc.id+'">'+sc.nome+'</option>').join('');
+  sub.disabled=!catId;
+}
 function openAssetModal(a){
   const propVal=a?.property||'owned';
   const body=`
@@ -1563,7 +1570,7 @@ function openAssetModal(a){
     </div>
     <div class="fr">
       <div class="fg"><div class="fl">Categoria</div>
-        <select class="fse" id="am-cat" onchange="document.getElementById('am-sub').innerHTML='<option value=\\'\\'>— Nessuna —</option>'+[...S.assetSubcat.filter(sc=>sc.categoria_id===this.value)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>'<option value=\\''+sc.id+'\\'>'+(sc.nome)+'</option>').join('')">
+        <select class="fse" id="am-cat" onchange="aggiornaSubcat(this.value)">
           <option value="">— Nessuna —</option>
           ${[...S.assetCat].sort((a,b)=>a.nome.localeCompare(b.nome)).map(cat=>`<option value="${cat.id}"${S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id===cat.id?' selected':''}>${esc(cat.icona||'')} ${esc(cat.nome)}</option>`).join('')}
         </select>
@@ -4279,7 +4286,7 @@ function renderLog(pb){
         <input class="fi-sm" id="log-search" style="width:200px" placeholder="🔍 Cerca utente, azione…"/>
         <select class="fi-sm" id="log-tipo">
           <option value="">Tutte le azioni</option>
-          ${tipiAzioni.map(t=>`<option value="${t}"${logTipo===t?' selected':''}>${t}</option>`).join('')}
+          ${tipiAzioni.map(t=>`<option value="${t}"${logTipo===t?" selected":""}>${t}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -4362,7 +4369,7 @@ async function doLogout(msg=''){
 $('lbtn').addEventListener('click',doLogin);
 $('lem').addEventListener('keydown',e=>{if(e.key==='Enter')$('lpw').focus();});
 $('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-$('lout').addEventListener('click',()=>openConf('Uscire dall\'applicazione?',doLogout));
+$('lout').addEventListener('click',()=>openConf("Uscire dall'applicazione?",doLogout));
 $('lem').focus();
 </script>
 </body>
