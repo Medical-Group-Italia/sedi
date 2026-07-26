@@ -221,7 +221,6 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 .tsl::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 input:checked+.tsl{background:var(--verde)}
 input:checked+.tsl::after{transform:translateX(16px)}
-
 /* ── Mappa pannello laterale ── */
 #mappa-panel{position:fixed;top:56px;right:0;width:80vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(calc(80vw + 10px));transition:transform .3s ease;display:flex;flex-direction:column;visibility:hidden}
 #mappa-panel.open{transform:translateX(0);visibility:visible}
@@ -282,7 +281,7 @@ input:checked+.tsl::after{transform:translateX(16px)}
 
 <!-- MODAL -->
 <div id="mappa-tab" title="Mappa interna" style="display:none">Mappe</div>
-<div id="mappa-panel">
+<div id="mappa-panel" style="display:none">
   <div id="mappa-panel-head">
     <select class="fi-sm" id="mp-sede" style="min-width:140px"><option value="">Seleziona sede…</option></select>
     <select class="fi-sm" id="mp-mappa" style="min-width:120px"><option value="">— Piano —</option></select>
@@ -301,10 +300,9 @@ input:checked+.tsl::after{transform:translateX(16px)}
 </div>
 
 <script>
+
 'use strict';
-/* ══════════════════════════════════════════
-   CONFIG
-══════════════════════════════════════════ */
+/* CONFIG */
 const CFG = {
   URL: 'https://iczsdqcnvauopwkuspti.supabase.co',
   KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljenNkcWNudmF1b3B3a3VzcHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTQ0MjMsImV4cCI6MjA5MjQzMDQyM30.SmcRHPLM2PEq4Hn-5CQhMyQKoz0PN_0lbN_X3l9MNUE',
@@ -312,9 +310,7 @@ const CFG = {
 };
 const T = n => `sedi_${n}`;
 
-/* ══════════════════════════════════════════
-   STATO
-══════════════════════════════════════════ */
+/* STATO */
 const S = {
   user: null, token: null, refreshToken: null,
   aree: [], sedi: [], categorie: [], sottocategorie: [], campi: [], valori: [], profili: [], log: [],
@@ -329,9 +325,7 @@ const S = {
   mappa: { sediSel: [], campiSel: [], search: '', catId: '', subcatId: '', leaflet: null, markers: {} },
 };
 
-/* ══════════════════════════════════════════
-   NAV
-══════════════════════════════════════════ */
+/* NAV */
 const NAV_MAIN = [
   {id:'griglia',    l:'Informazioni', ic:'', r:['admin','utente','it']},
   {id:'mappa',      l:'Mappa',        ic:'', r:['admin','utente','it']},
@@ -357,11 +351,9 @@ const NAV_ADMIN = [
 // compatibilità con codice che usa NAV
 const NAV = [...NAV_MAIN, ...NAV_ADMIN.map(n=>({...n,r:['admin']}))];
 
-/* ══════════════════════════════════════════
-   UTILITIES
-══════════════════════════════════════════ */
+/* UTILITIES */
 const $   = id => document.getElementById(id);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\x60/g,'&#96;').replace(/\$\{/g,'&#36;{');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,11));
 
 function fmt(d){
@@ -381,9 +373,7 @@ function toast(msg,type='ok'){
   _tid=setTimeout(()=>el.className='',3200);
 }
 
-/* ══════════════════════════════════════════
-   LOGO
-══════════════════════════════════════════ */
+/* LOGO */
 function logoSVG(small){
   const w=small?28:36,h=small?22:28;
   return `<svg width="${w}" height="${h}" viewBox="0 0 90 70" fill="none">
@@ -422,9 +412,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   }
 });
 
-/* ══════════════════════════════════════════
-   SUPABASE REST
-══════════════════════════════════════════ */
+/* SUPABASE REST */
 async function supaRefreshToken(){
   if(!S.refreshToken) throw new Error('Nessun refresh token');
   const res=await fetch(`${CFG.URL}/auth/v1/token?grant_type=refresh_token`,{method:'POST',
@@ -464,9 +452,7 @@ async function logAct(azione,dettaglio){
   try{await db('POST',T('log'),{body:{utente_id:S.user?.id,azione,dettaglio}});}catch(e){}
 }
 
-/* ══════════════════════════════════════════
-   CARICAMENTO DATI
-══════════════════════════════════════════ */
+/* CARICAMENTO DATI */
 async function loadAll(){
   const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe,mappeTesti]=await Promise.all([
     db('GET',T('aree'),{ord:'ordine.asc,nome.asc'}),
@@ -530,9 +516,7 @@ function getValore(sedeId,campoId){
   return S.valori.find(v=>v.sede_id===sedeId&&v.campo_id===campoId)?.valore||'';
 }
 
-/* ══════════════════════════════════════════
-   SIDEBAR / TOPBAR
-══════════════════════════════════════════ */
+/* SIDEBAR / TOPBAR */
 function renderSidebar(){
   const ruolo=S.user?.ruolo;
   const mainItems=NAV_MAIN.filter(n=>!n.r||n.r.includes(ruolo));
@@ -569,9 +553,7 @@ function goPage(pg){
   if(S._loginAt&&(Date.now()-S._loginAt)>36000000){doLogout('Sessione scaduta dopo 10 ore. Accedi di nuovo.');return;}
   S.page=pg; renderSidebar(); renderPage();
 }
-/* ══════════════════════════════════════════
-   EXPORT EXCEL
-══════════════════════════════════════════ */
+/* EXPORT EXCEL */
 function exportXlsx(rows, filename){
   const ws=XLSX.utils.json_to_sheet(rows);
   const wb=XLSX.utils.book_new();
@@ -688,9 +670,7 @@ function renderPage(){
   else if(S.page==='log')       renderLog(pb);
 }
 
-/* ══════════════════════════════════════════
-   MULTISELECT CATEGORIE
-══════════════════════════════════════════ */
+/* MULTISELECT CATEGORIE */
 function buildMultiSelCat(id,selIds,onChange){
   const all=S.categorie;
   const sel=[...selIds];
@@ -742,9 +722,7 @@ function buildMultiSelCat(id,selIds,onChange){
   return wrapper;
 }
 
-/* ══════════════════════════════════════════
-   MULTISELECT SEDI (componente riusabile)
-══════════════════════════════════════════ */
+/* MULTISELECT SEDI (componente riusabile) */
 function buildMultiSel(id,selIds,onChange){
   const sel=selIds;
   const label=()=>sel.length===sediOrdinate().length?'Tutte le sedi':
@@ -825,9 +803,7 @@ function buildMultiSel(id,selIds,onChange){
   return wrapper;
 }
 
-/* ══════════════════════════════════════════
-   PAGINA GRIGLIA
-══════════════════════════════════════════ */
+/* PAGINA GRIGLIA */
 function renderGriglia(pb){
   const isAdm=S.user?.ruolo==='admin';
   pb.innerHTML=`<div class="fian">
@@ -969,9 +945,7 @@ function renderGrigliaTable(){
   }
 }
 
-/* ══════════════════════════════════════════
-   PAGINA MAPPA
-══════════════════════════════════════════ */
+/* PAGINA MAPPA */
 function renderMappa(pb){
   pb.style.padding='0';
   pb.innerHTML=`<div id="map-page">
@@ -1233,12 +1207,8 @@ function renderSidebarCampi(){
   });
 }
 
-/* ══════════════════════════════════════════
-   PAGINA SEDI (CRUD)
-══════════════════════════════════════════ */
-/* ══════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════ */
+/* PAGINA SEDI (CRUD) */
+/* HELPERS */
 function fmtDate(d){ if(!d) return '—'; return new Date(d+'T00:00:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtMoney(v){ if(v===null||v===undefined) return '—'; return Number(v).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
 function assetNomeCategoria(assetId){
@@ -1251,9 +1221,7 @@ function sedeNome(id){ return S.sedi.find(s=>s.id===id)?.nome||'—'; }
 function fornitoreNome(id){ return S.fornitori.find(f=>f.id===id)?.nome||'—'; }
 function ragioneNome(id){ return S.ragioni.find(r=>r.id===id)?.nome||'—'; }
 
-/* ══════════════════════════════════════════
-   PAGINA ASSET
-══════════════════════════════════════════ */
+/* PAGINA ASSET */
 function renderAsset(pb){
   if(!S.asset_filter) S.asset_filter={search:'',catId:S.user?.ruolo==='it'?'cce7f33a-80d0-4b03-bf27-aefca23f9922':'',subcatId:'',sedeId:'',sort:'codice',sortDir:1,_focus:null};
   const f=S.asset_filter;
@@ -1623,7 +1591,7 @@ function openAssetModal(a){
   ]);
 }
 
-/* ── Ubicazioni ── */
+/*  Ubicazioni  */
 async function openUbicazioniModal(assetId){
   const a=S.asset.find(x=>x.id===assetId);
   const reload=async()=>{
@@ -1681,7 +1649,7 @@ async function openUbicazioniModal(assetId){
   });
 }
 
-/* ── Costi asset ── */
+/*  Costi asset  */
 async function openCostiAssetModal(assetId){
   const a=S.asset.find(x=>x.id===assetId);
   const costi=await db('GET',T('costi'),{flt:`asset_id=eq.${assetId}`,ord:'data_costo.desc'})||[];
@@ -1799,7 +1767,7 @@ async function openCostiAssetModal(assetId){
   });
 }
 
-/* ── Documenti ── */
+/*  Documenti  */
 async function openDocumentiModal(assetId){
   const a=S.asset.find(x=>x.id===assetId);
   const docs=await db('GET',T('documenti'),{flt:`asset_id=eq.${assetId}`,ord:'created_at.desc'})||[];
@@ -1869,9 +1837,7 @@ async function openDocumentiModal(assetId){
   });
 }
 
-/* ══════════════════════════════════════════
-   RIEPILOGO COSTI
-══════════════════════════════════════════ */
+/* RIEPILOGO COSTI */
 function renderCostiRiepilogo(pb){
   if(!S.costi_filter) S.costi_filter={anno:'',sedeId:'',fornitoreId:'',catId:''};
   const f=S.costi_filter;
@@ -1949,12 +1915,8 @@ function renderCostiRiepilogo(pb){
   $('cr-cat').addEventListener('change',e=>{f.catId=e.target.value;renderPage();});
 }
 
-/* ══════════════════════════════════════════
-   FORNITORI
-══════════════════════════════════════════ */
-/* ══════════════════════════════════════════
-   HELPERS SCADENZE
-══════════════════════════════════════════ */
+/* FORNITORI */
+/* HELPERS SCADENZE */
 function calcolaScadenza(ultimaVerifica, periodicita){
   if(!ultimaVerifica) return null;
   const d=new Date(ultimaVerifica+'T00:00:00');
@@ -1980,12 +1942,8 @@ function scadenzaBadge(giorni){
   return `<span class="bg" style="background:${giorni<=60?'#E67E22':'#27AE60'};color:#fff">${giorni} gg</span>`;
 }
 
-/* ══════════════════════════════════════════
-   PAGINA VERIFICHE
-══════════════════════════════════════════ */
-/* ══════════════════════════════════════════
-   ALERT EMAIL — HELPERS
-══════════════════════════════════════════ */
+/* PAGINA VERIFICHE */
+/* ALERT EMAIL — HELPERS */
 function getCfg(tipo, refId){
   return S.alertCfg.find(c=>c.tipo===tipo&&c.ref_id===refId)||null;
 }
@@ -2277,9 +2235,7 @@ function openVerificaModal(v){
   },50);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA CONVENZIONI
-══════════════════════════════════════════ */
+/* PAGINA CONVENZIONI */
 function renderConvenzioni(pb){
   const isAdm=S.user?.ruolo==='admin';
   if(!S.conf) S.conf={search:'',sort:'giorni'};
@@ -2394,9 +2350,7 @@ function openConvenzioneModal(con){
   },50);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA IMPIANTI
-══════════════════════════════════════════ */
+/* PAGINA IMPIANTI */
 function renderImpianti(pb){
   const isAdm=S.user?.ruolo==='admin';
   if(!S.impf) S.impf={search:'',sort:'giorni',sedeId:''};
@@ -2625,9 +2579,7 @@ async function openImpiantoModal(imp){
   setTimeout(bindScadenze,50);
 }
 
-/* ══════════════════════════════════════════
-   ASSEGNAZIONE ASSET - UTENTE
-══════════════════════════════════════════ */
+/* ASSEGNAZIONE ASSET - UTENTE */
 async function openAssetUtenteModal(assetId){
   const a=S.asset.find(x=>x.id===assetId);
   const storici=S.assetUtenti.filter(x=>x.asset_id===assetId).sort((a,b)=>b.data_da.localeCompare(a.data_da));
@@ -2709,9 +2661,7 @@ async function openAssetUtenteModal(assetId){
   },50);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA PRODUTTORI ASSET
-══════════════════════════════════════════ */
+/* PAGINA PRODUTTORI ASSET */
 function renderProduttori(pb){
   const isAdm=['admin','asset','it'].includes(S.user?.ruolo);
   if(!S._prodF) S._prodF={search:''};
@@ -2823,9 +2773,7 @@ function openProduttoreModal(p){
   },50);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA NOLEGGIATORI ASSET
-══════════════════════════════════════════ */
+/* PAGINA NOLEGGIATORI ASSET */
 function renderNoleggiatori(pb){
   const isAdm=['admin','asset'].includes(S.user?.ruolo);
   pb.innerHTML=`<div class="fian"><div class="card">
@@ -3015,9 +2963,7 @@ function openAssetSubcatModal(sc,catId){
   }}]);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA RAGIONI SOCIALI
-══════════════════════════════════════════ */
+/* PAGINA RAGIONI SOCIALI */
 function renderRagioni(pb){
   const ragioni=S.ragioni||[];
   pb.innerHTML=`<div class="fian"><div class="card">
@@ -3121,9 +3067,7 @@ function openRagioneModal(r){
   ]);
 }
 
-/* ══════════════════════════════════════════
-   PANNELLO MAPPA INTERNA
-══════════════════════════════════════════ */
+/* PANNELLO MAPPA INTERNA */
 function initMappaPanel(){
   const tab=document.getElementById('mappa-tab');
   const panel=document.getElementById('mappa-panel');
@@ -3469,9 +3413,7 @@ function renderMappaPannello(){
   }
 }
 
-/* ══════════════════════════════════════════
-   PAGINA SEDI: MAPPE
-══════════════════════════════════════════ */
+/* PAGINA SEDI: MAPPE */
 function renderSediMappe(pb){
   const canEdit=['admin','it'].includes(S.user?.ruolo);
   pb.innerHTML=`<div class="fian"><div class="card">
@@ -3526,7 +3468,7 @@ async function openMappaModal(m){
       <div class="fg"><div class="fl">Ordine</div><input class="fi" id="mm-ord" type="number" value="${m?.ordine||0}" style="max-width:80px"/></div>
     </div>
     <div class="fg"><div class="fl">Immagine planimetria (JPG/PNG)</div>
-      <input type="file" class="fi" id="mm-img" accept="image/*" style="padding:6px"/>
+      <input type="file" class="fi" id="mm-img" accept="image/* " style="padding:6px"/>
       ${m?.immagine_url?`<div style="font-size:12px;color:var(--g500);margin-top:4px">Immagine attuale: <a href="${esc(m.immagine_url)}" target="_blank" style="color:var(--verde)">visualizza</a> — carica un nuovo file per sostituirla</div>`:''}
     </div>`;
   openM(m?'✏ Modifica mappa':'+ Nuova mappa',body,[
@@ -3728,9 +3670,8 @@ function openSedeModal(sede){
   ]);
 }
 
-/* ══════════════════════════════════════════
-   PAGINA STRUTTURA (aree + categorie + sottocategorie + campi)
-══════════════════════════════════════════ */
+/* 
+   PAGINA STRUTTURA (aree + categorie + sottocategorie + campi) */
 function renderAree(pb){
   pb.innerHTML=`<div class="fian"><div class="card">
     <div class="ch">
@@ -4012,7 +3953,7 @@ function openCampoModal(campo,subcatId){
 }
 
 
-/* ── Check email live + avviso password cross-tool ── */
+/*  Check email live + avviso password cross-tool  */
 async function checkEmailLive(inputEl,infoEl,pwdWrap,fnName){
   const email=inputEl.value.trim();
   if(infoEl){infoEl.style.display='none'; infoEl.dataset.exists='';}
@@ -4232,9 +4173,7 @@ function openUtenteModal(u){
   }
 }
 
-/* ══════════════════════════════════════════
-   PAGINA LOG
-══════════════════════════════════════════ */
+/* PAGINA LOG */
 function renderLog(pb){
   let logPage=0,logQ='',logTipo='';
   const PAGE=20;
@@ -4297,9 +4236,7 @@ function renderLog(pb){
   $('log-tipo').addEventListener('change',e=>{logTipo=e.target.value;logPage=0;render();});
 }
 
-/* ══════════════════════════════════════════
-   MODAL
-══════════════════════════════════════════ */
+/* MODAL */
 function openM(title,body,btns=[]){
   $('mtit').textContent=title;
   $('mbdy').innerHTML=body;
@@ -4322,9 +4259,7 @@ $('mcls').addEventListener('click',closeM);
 $('mov').addEventListener('click',e=>{if(e.target===$('mov'))closeM();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
 
-/* ══════════════════════════════════════════
-   AUTH
-══════════════════════════════════════════ */
+/* AUTH */
 async function doLogin(){
   const email=$('lem').value.trim(),pwd=$('lpw').value;
   const btn=$('lbtn'),err=$('lerr');
@@ -4371,6 +4306,7 @@ $('lem').addEventListener('keydown',e=>{if(e.key==='Enter')$('lpw').focus();});
 $('lpw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 $('lout').addEventListener('click',()=>openConf("Uscire dall'applicazione?",doLogout));
 $('lem').focus();
+
 </script>
 </body>
 </html>
