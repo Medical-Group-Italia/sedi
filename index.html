@@ -223,11 +223,11 @@ input:checked+.tsl{background:var(--verde)}
 input:checked+.tsl::after{transform:translateX(16px)}
 
 /* ── Mappa pannello laterale ── */
-#mappa-panel{position:fixed;top:56px;right:0;width:520px;max-width:90vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column}
+#mappa-panel{position:fixed;display:none;top:56px;right:0;width:520px;max-width:90vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column}
 #mappa-panel.open{transform:translateX(0)}
-#mappa-tab{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:201;writing-mode:vertical-rl;background:var(--verde);color:#fff;padding:12px 6px;border-radius:6px 0 0 6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;transition:right .3s ease;user-select:none}
-#mappa-tab.open{right:520px}
-@media(max-width:540px){#mappa-tab.open{right:90vw}#mappa-panel{width:90vw}}
+#mappa-tab{position:fixed;top:50%;right:0;display:none;transform:translateY(-50%);z-index:201;writing-mode:vertical-rl;background:var(--verde);color:#fff;padding:12px 6px;border-radius:6px 0 0 6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;transition:right .3s ease;user-select:none}
+#mappa-tab.open{right:80vw}
+@media(max-width:600px){#mappa-tab.open{right:95vw}#mappa-panel{width:95vw}}
 #mappa-panel-head{padding:12px 14px;border-bottom:1px solid var(--g200);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
 #mappa-panel-body{flex:1;overflow:auto;position:relative;background:var(--g50)}
 .mappa-wrap{position:relative;display:inline-block;min-width:100%}
@@ -276,11 +276,12 @@ input:checked+.tsl::after{transform:translateX(16px)}
 </div>
 
 <!-- MODAL -->
-<div id="mappa-tab" title="Mappa interna">🗺 Mappa</div>
+<div id="mappa-tab" title="Mappa interna">Mappe</div>
 <div id="mappa-panel">
   <div id="mappa-panel-head">
     <select class="fi-sm" id="mp-sede" style="min-width:140px"><option value="">Seleziona sede…</option></select>
     <select class="fi-sm" id="mp-mappa" style="min-width:120px"><option value="">— Piano —</option></select>
+    <button class="btn bs bsm" id="mp-place-btn" style="display:none">+ Posiziona asset</button>
     <button class="btn bd bsm" id="mp-close" style="margin-left:auto">✕</button>
   </div>
   <div id="mappa-panel-body"><div style="padding:30px;text-align:center;color:var(--g400)">Seleziona una sede e una mappa</div></div>
@@ -3221,6 +3222,19 @@ function renderMappaPannello(){
     </div>`;
   }).join('');
 
+  const placeBtn=document.getElementById('mp-place-btn');
+  if(placeBtn){
+    placeBtn.style.display=canEdit&&mappa.immagine_url?'':'none';
+    placeBtn.onclick=()=>{
+      S._mappaPanel._placeMode=!S._mappaPanel._placeMode;
+      placeBtn.textContent=S._mappaPanel._placeMode?'✕ Annulla posizionamento':'+ Posiziona asset';
+      placeBtn.style.background=S._mappaPanel._placeMode?'var(--red)':'';
+      placeBtn.style.color=S._mappaPanel._placeMode?'#fff':'';
+      const wrap=document.querySelector('#mappa-img-wrap');
+      if(wrap) wrap.style.cursor=S._mappaPanel._placeMode?'crosshair':'default';
+    };
+  }
+
   mpBody.innerHTML=`<div class="mappa-wrap" id="mappa-img-wrap">
     <img src="${esc(mappa.immagine_url)}" id="mappa-img" draggable="false" style="display:block;max-width:100%;height:auto"/>
     ${pinsHTML}
@@ -3259,11 +3273,12 @@ function renderMappaPannello(){
       wrap.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
       wrap.addEventListener('drop',async e=>{
         e.preventDefault();
-        const [pid,aid]=e.dataTransfer.getData('text/plain').split('|');
+        const data=e.dataTransfer.getData('text/plain');
+        if(!data) return;
+        const [pid,aid]=data.split('|');
         const rect=img.getBoundingClientRect();
         const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
         const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
-        // Salva posizione
         const existing=S.assetMappe.find(p=>p.id===pid);
         if(existing){
           await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
@@ -3273,6 +3288,51 @@ function renderMappaPannello(){
           S.assetMappe.push(np);
         }
         renderMappaPannello();
+      });
+
+      // Click sulla mappa per posizionare un nuovo asset
+      wrap.addEventListener('click',e=>{
+        if(e.target.closest('.mappa-pin')) return; // ignora click sui pin esistenti
+        if(!S._mappaPanel._placeMode) return;
+        const rect=img.getBoundingClientRect();
+        const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
+        const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
+        S._mappaPanel._pendingPos={x,y};
+        // Mostra popup asset select
+        const existing=new Set(S.assetMappe.filter(p=>p.mappa_id===mappaId).map(p=>p.asset_id));
+        const disponibili=S.asset.filter(a=>!existing.has(a.id));
+        if(!disponibili.length){toast('Tutti gli asset sono già posizionati su questa mappa','err');return;}
+        openM('📍 Posiziona asset',`
+          <div style="font-size:13px;color:var(--g500);margin-bottom:10px">Seleziona l'asset da posizionare in questo punto</div>
+          <input class="fi" id="place-search" placeholder="🔍 Cerca…" style="margin-bottom:8px"/>
+          <div id="place-list" style="max-height:240px;overflow-y:auto;border:1px solid var(--g200);border-radius:var(--rsm)">
+            ${disponibili.map(a=>`<div data-place-id="${a.id}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--g100);font-size:13px" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
+              <strong>${esc(a.nome)}</strong>${a.codice?` <span style="color:var(--g500);font-size:11px;font-family:monospace">${esc(a.codice)}</span>`:''}
+            </div>`).join('')}
+          </div>`,
+        [{l:'Annulla',c:'bs',a:closeM}]);
+        setTimeout(()=>{
+          $('place-search')?.addEventListener('input',e2=>{
+            const q=e2.target.value.toLowerCase();
+            document.querySelectorAll('[data-place-id]').forEach(el=>{
+              el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';
+            });
+          });
+          document.querySelectorAll('[data-place-id]').forEach(el=>{
+            el.addEventListener('click',async()=>{
+              const aid=el.dataset.placeId;
+              const {x,y}=S._mappaPanel._pendingPos;
+              const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
+              S.assetMappe.push(np);
+              closeM();
+              S._mappaPanel._placeMode=false;
+              const btn=document.getElementById('mp-place-btn');
+              if(btn){btn.textContent='+ Posiziona asset';btn.style.background='';}
+              renderMappaPannello();
+              toast('Asset posizionato ✅');
+            });
+          });
+        },50);
       });
     }
   }
@@ -4150,6 +4210,8 @@ async function doLogin(){
     S.user=profilo;
     await loadAll();
     $('lp').classList.add('hid'); $('app').classList.remove('hid');
+    document.getElementById('mappa-tab').style.display='';
+    document.getElementById('mappa-panel').style.display='';
     renderSidebar(); goPage('griglia');
     popolaSediPanel();
     logAct('login',`Accesso effettuato — ${S.user.cognome} ${S.user.nome}`);
@@ -4163,6 +4225,9 @@ async function doLogout(msg=''){
   try{await supaLogout();}catch(e){}
   S.user=null;S.token=null;S.refreshToken=null;
   $('app').classList.add('hid'); $('lp').classList.remove('hid'); $('lpw').value='';
+  document.getElementById('mappa-tab').style.display='none';
+  const mp=document.getElementById('mappa-panel');if(mp){mp.style.display='none';mp.classList.remove('open');}
+  document.getElementById('mappa-tab').classList.remove('open');
   const btn=$('lbtn'); if(btn){btn.innerHTML='Accedi';btn.disabled=false;}
   const err=$('lerr');
   if(err){
