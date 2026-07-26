@@ -1303,7 +1303,10 @@ function buildAssetTableHTML(lista){
     const ub=S.assetSedi.filter(x=>x.asset_id===a.id&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi)).sort((x,y)=>y.data_da.localeCompare(x.data_da))[0];
     const costiA=S.costi.filter(x=>x.asset_id===a.id).length;
     return `<tr>
-      <td><span style="font-family:monospace;font-size:12px;color:var(--g500)">${esc(a.codice||'—')}</span></td>
+      <td>
+        <span style="font-family:monospace;font-size:12px;color:var(--g500)">${esc(a.codice||'—')}</span>
+        ${a.anydesk?`<div style="margin-top:3px"><span data-copy="${esc(a.anydesk)}" title="Copia AnyDesk ID" style="display:inline-block;background:#FDECEA;color:#C0392B;border-radius:4px;font-size:10px;font-family:monospace;padding:1px 6px;cursor:pointer;user-select:none" onclick="navigator.clipboard.writeText('${esc(a.anydesk)}').then(()=>{this.textContent='✓ copiato';setTimeout(()=>{this.textContent='${esc(a.anydesk)}';},1500)})">${esc(a.anydesk)}</span></div>`:''}
+      </td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="tn">${esc(a.nome)}</div>
