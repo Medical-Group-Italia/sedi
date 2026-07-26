@@ -221,6 +221,25 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 .tsl::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 input:checked+.tsl{background:var(--verde)}
 input:checked+.tsl::after{transform:translateX(16px)}
+
+/* ── Mappa pannello laterale ── */
+#mappa-panel{position:fixed;top:56px;right:0;width:520px;max-width:90vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column}
+#mappa-panel.open{transform:translateX(0)}
+#mappa-tab{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:201;writing-mode:vertical-rl;background:var(--verde);color:#fff;padding:12px 6px;border-radius:6px 0 0 6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;transition:right .3s ease;user-select:none}
+#mappa-tab.open{right:520px}
+@media(max-width:540px){#mappa-tab.open{right:90vw}#mappa-panel{width:90vw}}
+#mappa-panel-head{padding:12px 14px;border-bottom:1px solid var(--g200);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+#mappa-panel-body{flex:1;overflow:auto;position:relative;background:var(--g50)}
+.mappa-wrap{position:relative;display:inline-block;min-width:100%}
+.mappa-wrap img{display:block;max-width:100%;height:auto;user-select:none}
+.mappa-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10}
+.mappa-pin .pin-dot{width:28px;height:28px;border-radius:50%;background:var(--verde);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;transition:background .15s,transform .15s}
+.mappa-pin.highlight .pin-dot{background:#E74C3C;transform:scale(1.3)}
+.mappa-pin:hover .pin-dot{transform:scale(1.2)}
+.mappa-pin .pin-label{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#222;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s}
+.mappa-pin:hover .pin-label{opacity:1}
+.mappa-pin.dragging{opacity:.7;z-index:20}
+
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -285,6 +304,7 @@ const S = {
   aree: [], sedi: [], categorie: [], sottocategorie: [], campi: [], valori: [], profili: [], log: [],
   ragioni: [], fornitori: [], assetCat: [], assetSubcat: [], asset: [], assetSedi: [], costi: [], documenti: [],
   assetCaratteristiche: [], assetProduttori: [], assetNoleggiatori: [], assetUtenti: [],
+  mappe: [], assetMappe: [], _mappaPanel:{open:false,sedeId:'',mappaId:'',highlightId:''},
   verifiche: [], convenzioni: [], alertCfg: [], impianti: [], impiantiScadenze: [],
   page: 'griglia',
   // filtri griglia
@@ -307,6 +327,7 @@ const NAV_MAIN = [
 ];
 const NAV_ADMIN = [
   {id:'sedi',        l:'Sedi',                ic:'', r:['admin']},
+  {id:'sedi_mappe',  l:'Sedi: mappe',         ic:'', r:['admin','it']},
   {id:'ragioni',     l:'Ragioni sociali',     ic:'', r:['admin']},
   {id:'aree',        l:'Aree geografiche',    ic:'', r:['admin']},
   {id:'fornitori',   l:'Fornitori',           ic:'', r:['admin']},
@@ -430,7 +451,7 @@ async function logAct(azione,dettaglio){
    CARICAMENTO DATI
 ══════════════════════════════════════════ */
 async function loadAll(){
-  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti]=await Promise.all([
+  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe]=await Promise.all([
     db('GET',T('aree'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('sedi'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('ragioni_sociali'),{ord:'nome.asc'}),
@@ -455,6 +476,8 @@ async function loadAll(){
     db('GET',T('asset_produttori'),{ord:'nome.asc'}),
     db('GET',T('asset_noleggiatori'),{ord:'nome.asc'}),
     db('GET',T('asset_utenti'),{ord:'data_da.desc'}),
+    db('GET',T('mappe'),{ord:'ordine.asc,nome.asc'}),
+    db('GET',T('asset_mappa'),{}),
   ]);
   S.aree=aree||[];S.sedi=sedi||[];S.ragioni=ragioni||[];S.categorie=categorie||[];
   S.sottocategorie=sottocategorie||[];S.campi=campi||[];
@@ -464,6 +487,7 @@ async function loadAll(){
   S.verifiche=verifiche||[];S.convenzioni=convenzioni||[];S.alertCfg=alertCfg||[];
   S.impianti=impianti||[];S.impiantiScadenze=impiantiScadenze||[];S.assetCaratteristiche=assetCaratteristiche||[];
   S.assetProduttori=assetProduttori||[];S.assetNoleggiatori=assetNoleggiatori||[];S.assetUtenti=assetUtenti||[];
+  S.mappe=mappe||[];S.assetMappe=assetMappe||[];
   // init sedi sel default (tutte)
   if(!S.griglia.sediSel.length) S.griglia.sediSel=sediOrdinate().map(s=>s.id);
   // mappa: default nessuna sede selezionata (popup tutti chiusi)
@@ -631,6 +655,7 @@ function renderPage(){
   else if(S.page==='asset')     renderAsset(pb);
   else if(S.page==='costi_ric') renderCostiRiepilogo(pb);
   else if(S.page==='sedi')      renderSediPage(pb);
+  else if(S.page==='sedi_mappe') renderSediMappe(pb);
   else if(S.page==='ragioni')   renderRagioni(pb);
   else if(S.page==='fornitori')   renderFornitori(pb);
   else if(S.page==='produttori')   renderProduttori(pb);
@@ -1318,7 +1343,7 @@ function buildAssetTableHTML(lista){
       <td>${(()=>{
         const au=S.assetUtenti?.filter(x=>x.asset_id===a.id&&!x.data_a)[0];
         if(au){const u=S.profili.find(p=>p.id===au.utente_id);return u?`<span class="bg bg-it" style="font-size:11px">${esc(u.cognome+' '+u.nome)}</span>`:'<span class="bg bg-usr">Utente</span>';}
-        return ub?`<span class="bg bg-on">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>';
+        return ub?`<span class="bg bg-on" data-open-mappa="${a.id}" style="cursor:pointer" title="Apri mappa">${esc(sedeNome(ub.sede_id))}</span>`:'<span class="bg bg-off">Non assegnato</span>';
       })()}</td>
       ${isIT?'':`<td>${costiA?`<span class="bg" style="background:var(--blue-xlight);color:var(--navy)">${costiA} costi</span>`:'—'}</td>`}
       <td><div class="tda">
@@ -1412,6 +1437,7 @@ function bindAssetTableEvents(){
   wrap.querySelectorAll('[data-acost]').forEach(b=>b.addEventListener('click',()=>openCostiAssetModal(b.dataset.acost)));
   wrap.querySelectorAll('[data-acar]').forEach(b=>b.addEventListener('click',()=>openCaratteristicheModal(b.dataset.acar,b.dataset.tipo)));
   wrap.querySelectorAll('[data-auser]').forEach(b=>b.addEventListener('click',()=>openAssetUtenteModal(b.dataset.auser)));
+  wrap.querySelectorAll('[data-open-mappa]').forEach(b=>b.addEventListener('click',()=>openMappaPanelForAsset(b.dataset.openMappa)));
 }
 
 async function openCaratteristicheModal(assetId, tipo){
@@ -3070,6 +3096,284 @@ function openRagioneModal(r){
   ]);
 }
 
+/* ══════════════════════════════════════════
+   PANNELLO MAPPA INTERNA
+══════════════════════════════════════════ */
+function initMappaPanel(){
+  const tab=document.getElementById('mappa-tab');
+  const panel=document.getElementById('mappa-panel');
+  if(!tab||!panel||panel._init) return;
+  panel._init=true;
+
+  // Popola select sedi
+  const mpSede=document.getElementById('mp-sede');
+  const mpMappa=document.getElementById('mp-mappa');
+  const mpBody=document.getElementById('mappa-panel-body');
+
+  const popolaSedi=()=>{
+    mpSede.innerHTML='<option value="">Seleziona sede…</option>'+
+      sediOrdinate().map(s=>`<option value="${s.id}"${S._mappaPanel.sedeId===s.id?' selected':''}>${esc(s.nome)}</option>`).join('');
+  };
+  popolaSedi();
+
+  const aggiornaMappa=()=>{
+    const sedeId=mpSede.value;
+    const mappeS=S.mappe.filter(m=>m.sede_id===sedeId);
+    mpMappa.innerHTML='<option value="">— Piano —</option>'+
+      mappeS.map(m=>`<option value="${m.id}"${S._mappaPanel.mappaId===m.id?' selected':''}>${esc(m.nome)}</option>`).join('');
+    if(!S._mappaPanel.mappaId&&mappeS.length) {
+      mpMappa.value=mappeS[0].id;
+      S._mappaPanel.mappaId=mappeS[0].id;
+    }
+    renderMappaPannello();
+  };
+
+  mpSede.addEventListener('change',()=>{
+    S._mappaPanel.sedeId=mpSede.value;
+    S._mappaPanel.mappaId='';
+    S._mappaPanel.highlightId='';
+    aggiornaMappa();
+  });
+  mpMappa.addEventListener('change',()=>{
+    S._mappaPanel.mappaId=mpMappa.value;
+    renderMappaPannello();
+  });
+  document.getElementById('mp-close').addEventListener('click',()=>toggleMappaPanel(false));
+  tab.addEventListener('click',()=>toggleMappaPanel());
+
+  if(S._mappaPanel.sedeId) aggiornaMappa();
+}
+
+function toggleMappaPanel(force=null){
+  const tab=document.getElementById('mappa-tab');
+  const panel=document.getElementById('mappa-panel');
+  if(!tab||!panel) return;
+  const open=force!==null?force:!panel.classList.contains('open');
+  panel.classList.toggle('open',open);
+  tab.classList.toggle('open',open);
+  S._mappaPanel.open=open;
+}
+
+function openMappaPanelForAsset(assetId){
+  // Trova la mappa dell'asset
+  const pos=S.assetMappe.find(m=>m.asset_id===assetId);
+  if(pos){
+    const mappa=S.mappe.find(m=>m.id===pos.mappa_id);
+    if(mappa){
+      S._mappaPanel.sedeId=mappa.sede_id;
+      S._mappaPanel.mappaId=mappa.id;
+    }
+  }else{
+    // Usa sede attuale
+    const oggi=new Date().toISOString().slice(0,10);
+    const ub=S.assetSedi.filter(x=>x.asset_id===assetId&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi))[0];
+    if(ub) S._mappaPanel.sedeId=ub.sede_id;
+  }
+  S._mappaPanel.highlightId=assetId;
+  // Aggiorna selects
+  const mpSede=document.getElementById('mp-sede');
+  const mpMappa=document.getElementById('mp-mappa');
+  if(mpSede) mpSede.value=S._mappaPanel.sedeId;
+  if(mpMappa){
+    const mappeS=S.mappe.filter(m=>m.sede_id===S._mappaPanel.sedeId);
+    mpMappa.innerHTML='<option value="">— Piano —</option>'+
+      mappeS.map(m=>`<option value="${m.id}"${S._mappaPanel.mappaId===m.id?' selected':''}>${esc(m.nome)}</option>`).join('');
+    if(S._mappaPanel.mappaId) mpMappa.value=S._mappaPanel.mappaId;
+    else if(mappeS.length){mpMappa.value=mappeS[0].id;S._mappaPanel.mappaId=mappeS[0].id;}
+  }
+  toggleMappaPanel(true);
+  renderMappaPannello();
+}
+
+function renderMappaPannello(){
+  const mpBody=document.getElementById('mappa-panel-body');
+  if(!mpBody) return;
+  const {mappaId,highlightId}=S._mappaPanel;
+  const canEdit=['admin','it'].includes(S.user?.ruolo);
+
+  if(!mappaId){
+    mpBody.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400)">Seleziona una mappa</div>';
+    return;
+  }
+  const mappa=S.mappe.find(m=>m.id===mappaId);
+  if(!mappa){mpBody.innerHTML='<div style="padding:30px;text-align:center;color:var(--g400)">Mappa non trovata</div>';return;}
+
+  if(!mappa.immagine_url){
+    mpBody.innerHTML=`<div style="padding:30px;text-align:center;color:var(--g400)">Nessuna immagine caricata per questa mappa.<br>${canEdit?`<button class="btn bpg bsm" style="margin-top:12px" onclick="openMappaModal('${mappa.id}')">Carica immagine</button>`:''}`;
+    return;
+  }
+
+  // Segnalini per questa mappa
+  const pins=S.assetMappe.filter(p=>p.mappa_id===mappaId);
+  const pinsHTML=pins.map(p=>{
+    const a=S.asset.find(x=>x.id===p.asset_id);
+    if(!a) return '';
+    const isHL=a.id===highlightId;
+    const label=a.codice||a.nome;
+    const au=S.assetUtenti?.find(x=>x.asset_id===a.id&&!x.data_a);
+    const utente=au?S.profili.find(u=>u.id===au.utente_id):null;
+    const tooltip=`${esc(a.nome)}${utente?' · '+esc(utente.cognome+' '+utente.nome):''}`;
+    return `<div class="mappa-pin${isHL?' highlight':''}" data-aid="${a.id}" data-pid="${p.id}"
+      style="left:${p.x}%;top:${p.y}%;position:absolute;transform:translate(-50%,-100%);cursor:${canEdit?'grab':'pointer'};z-index:${isHL?15:10}">
+      <div class="pin-dot" style="font-size:9px">${esc(label.slice(0,4))}</div>
+      <div class="pin-label">${tooltip}</div>
+    </div>`;
+  }).join('');
+
+  mpBody.innerHTML=`<div class="mappa-wrap" id="mappa-img-wrap">
+    <img src="${esc(mappa.immagine_url)}" id="mappa-img" draggable="false" style="display:block;max-width:100%;height:auto"/>
+    ${pinsHTML}
+  </div>`;
+
+  // Scroll sull'elemento evidenziato
+  if(highlightId){
+    const hlPin=mpBody.querySelector('.mappa-pin.highlight');
+    if(hlPin) setTimeout(()=>hlPin.scrollIntoView({block:'center',inline:'center'}),100);
+  }
+
+  // Click su pin → apri modale asset
+  mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
+    pin.addEventListener('click',e=>{
+      if(pin.dataset.dragging==='1') return;
+      const a=S.asset.find(x=>x.id===pin.dataset.aid);
+      if(a) openAssetModal(a);
+    });
+  });
+
+  // Drag & drop segnalini (solo admin/it)
+  if(canEdit){
+    mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
+      pin.setAttribute('draggable','true');
+      pin.addEventListener('dragstart',e=>{
+        pin.dataset.dragging='0';
+        e.dataTransfer.setData('text/plain',pin.dataset.pid+'|'+pin.dataset.aid);
+        pin.classList.add('dragging');
+      });
+      pin.addEventListener('dragend',()=>{pin.classList.remove('dragging');});
+    });
+
+    const wrap=mpBody.querySelector('#mappa-img-wrap');
+    const img=mpBody.querySelector('#mappa-img');
+    if(wrap&&img){
+      wrap.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+      wrap.addEventListener('drop',async e=>{
+        e.preventDefault();
+        const [pid,aid]=e.dataTransfer.getData('text/plain').split('|');
+        const rect=img.getBoundingClientRect();
+        const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
+        const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
+        // Salva posizione
+        const existing=S.assetMappe.find(p=>p.id===pid);
+        if(existing){
+          await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
+          S.assetMappe=S.assetMappe.map(p=>p.id===pid?{...p,x,y}:p);
+        }else{
+          const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
+          S.assetMappe.push(np);
+        }
+        renderMappaPannello();
+      });
+    }
+  }
+}
+
+/* ══════════════════════════════════════════
+   PAGINA SEDI: MAPPE
+══════════════════════════════════════════ */
+function renderSediMappe(pb){
+  const canEdit=['admin','it'].includes(S.user?.ruolo);
+  pb.innerHTML=`<div class="fian"><div class="card">
+    <div class="ch"><span class="ct">🗺 Sedi: mappe (${S.mappe.length})</span>
+      ${canEdit?`<button class="btn bpg bsm" id="sm-add">+ Nuova mappa</button>`:''}
+    </div>
+    ${!S.mappe.length?`<div class="emp"><div class="emi">🗺</div><div class="emt">Nessuna mappa configurata</div></div>`:
+    `<table class="dt"><thead><tr><th>Sede</th><th>Nome mappa</th><th>Ordine</th><th>Immagine</th><th>Asset posizionati</th><th>Azioni</th></tr></thead><tbody>
+    ${[...S.mappe].sort((a,b)=>{
+      const sa=S.sedi.find(s=>s.id===a.sede_id)?.nome||'';
+      const sb=S.sedi.find(s=>s.id===b.sede_id)?.nome||'';
+      return sa.localeCompare(sb)||(a.ordine-b.ordine);
+    }).map(m=>{
+      const sede=S.sedi.find(s=>s.id===m.sede_id);
+      const nAsset=S.assetMappe.filter(p=>p.mappa_id===m.id).length;
+      return `<tr>
+        <td><div class="tn">${esc(sede?.nome||'—')}</div></td>
+        <td>${esc(m.nome)}</td>
+        <td style="color:var(--g500);font-size:12px">${m.ordine||0}</td>
+        <td>${m.immagine_url?`<a href="${esc(m.immagine_url)}" target="_blank" style="color:var(--verde);font-size:12px">✓ Caricata</a>`:'<span style="color:var(--g400);font-size:12px">Nessuna</span>'}</td>
+        <td><span class="bg bg-usr">${nAsset} asset</span></td>
+        <td><div class="tda">
+          <button class="btn bs bsm" data-sme="${m.id}">✏</button>
+          <button class="btn bd bsm" data-smd="${m.id}">🗑</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`}
+  </div></div>`;
+  $('sm-add')?.addEventListener('click',()=>openMappaModal(null));
+  pb.querySelectorAll('[data-sme]').forEach(b=>b.addEventListener('click',()=>openMappaModal(S.mappe.find(x=>x.id===b.dataset.sme))));
+  pb.querySelectorAll('[data-smd]').forEach(b=>b.addEventListener('click',()=>{
+    const m=S.mappe.find(x=>x.id===b.dataset.smd);
+    openConf(`Eliminare la mappa "${m?.nome}"? Tutte le posizioni asset verranno perse.`,async()=>{
+      await db('DELETE',T('mappe'),{flt:`id=eq.${b.dataset.smd}`});
+      S.mappe=S.mappe.filter(x=>x.id!==b.dataset.smd);
+      S.assetMappe=S.assetMappe.filter(x=>x.mappa_id!==b.dataset.smd);
+      renderPage(); toast('Mappa eliminata');
+    });
+  }));
+}
+
+async function openMappaModal(m){
+  const body=`
+    <div class="fg"><div class="fl">Sede *</div>
+      <select class="fse" id="mm-sede">
+        <option value="">— Seleziona sede —</option>
+        ${sediOrdinate().map(s=>`<option value="${s.id}"${m?.sede_id===s.id?' selected':''}>${esc(s.nome)}</option>`).join('')}
+      </select></div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Nome mappa *</div><input class="fi" id="mm-nome" value="${esc(m?.nome||'')}" placeholder="es. Piano terra"/></div>
+      <div class="fg"><div class="fl">Ordine</div><input class="fi" id="mm-ord" type="number" value="${m?.ordine||0}" style="max-width:80px"/></div>
+    </div>
+    <div class="fg"><div class="fl">Immagine planimetria (JPG/PNG)</div>
+      <input type="file" class="fi" id="mm-img" accept="image/*" style="padding:6px"/>
+      ${m?.immagine_url?`<div style="font-size:12px;color:var(--g500);margin-top:4px">Immagine attuale: <a href="${esc(m.immagine_url)}" target="_blank" style="color:var(--verde)">visualizza</a> — carica un nuovo file per sostituirla</div>`:''}
+    </div>`;
+  openM(m?'✏ Modifica mappa':'+ Nuova mappa',body,[
+    {l:'Annulla',c:'bs',a:closeM},
+    {l:'Salva',c:'bpg',a:async()=>{
+      const sede=$('mm-sede').value,nome=$('mm-nome').value.trim();
+      if(!sede||!nome){toast('Sede e nome obbligatori','err');return;}
+      const ord=parseInt($('mm-ord').value)||0;
+      let immagine_url=m?.immagine_url||null;
+      // Upload immagine se selezionata
+      const file=$('mm-img').files[0];
+      if(file){
+        try{
+          const ext=file.name.split('.').pop();
+          const path=`${sede}/${Date.now()}.${ext}`;
+          const uploadRes=await fetch(`${CFG.URL}/storage/v1/object/mappe-sedi/${path}`,{
+            method:'POST',
+            headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token}`,'Content-Type':file.type,'x-upsert':'true'},
+            body:file
+          });
+          if(!uploadRes.ok) throw new Error('Errore upload immagine');
+          immagine_url=`${CFG.URL}/storage/v1/object/public/mappe-sedi/${path}`;
+        }catch(e){toast('Errore upload: '+e.message,'err');return;}
+      }
+      try{
+        const payload={sede_id:sede,nome,ordine:ord,immagine_url};
+        if(m){
+          await db('PATCH',T('mappe'),{flt:`id=eq.${m.id}`,body:payload});
+          S.mappe=S.mappe.map(x=>x.id===m.id?{...x,...payload}:x);
+        }else{
+          const [nm]=await db('POST',T('mappe'),{body:payload});
+          S.mappe.push(nm);
+        }
+        closeM(); renderPage(); toast(m?'Mappa aggiornata':'Mappa aggiunta ✅');
+      }catch(e){toast(e.message,'err');}
+    }},
+  ]);
+}
+
 function renderSediPage(pb){
   // raggruppa sedi per area, ordinate per campo ordine
   const perArea={};
@@ -3846,6 +4150,7 @@ async function doLogin(){
     await loadAll();
     $('lp').classList.add('hid'); $('app').classList.remove('hid');
     renderSidebar(); goPage('griglia');
+    setTimeout(initMappaPanel,200);
     logAct('login',`Accesso effettuato — ${S.user.cognome} ${S.user.nome}`);
     toast(`Benvenuto, ${S.user.nome}! ✅`);
   }catch(e){
