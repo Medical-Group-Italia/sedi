@@ -276,6 +276,15 @@ input:checked+.tsl::after{transform:translateX(16px)}
 </div>
 
 <!-- MODAL -->
+<div id="mappa-tab" title="Mappa interna">🗺 Mappa</div>
+<div id="mappa-panel">
+  <div id="mappa-panel-head">
+    <select class="fi-sm" id="mp-sede" style="min-width:140px"><option value="">Seleziona sede…</option></select>
+    <select class="fi-sm" id="mp-mappa" style="min-width:120px"><option value="">— Piano —</option></select>
+    <button class="btn bd bsm" id="mp-close" style="margin-left:auto">✕</button>
+  </div>
+  <div id="mappa-panel-body"><div style="padding:30px;text-align:center;color:var(--g400)">Seleziona una sede e una mappa</div></div>
+</div>
 <div class="mo hid" id="mov">
   <div class="mb">
     <div class="mh"><span class="mt" id="mtit">—</span><button class="bic" id="mcls">✕</button></div>
@@ -386,6 +395,7 @@ function logoHTML(small=false){return `
     </div>
   </div>`;}
 document.addEventListener('DOMContentLoaded',async ()=>{
+  initMappaPanel();
   const tl=$('tb-logo'); if(tl) tl.innerHTML=logoHTML(true);
   const ll=$('login-logo'); if(ll) ll.innerHTML=logoHTML(false);
   const verEl=$('login-ver');
@@ -3105,43 +3115,45 @@ function initMappaPanel(){
   if(!tab||!panel||panel._init) return;
   panel._init=true;
 
-  // Popola select sedi
+  // Listener tab e close — funzionano subito
+  tab.addEventListener('click',()=>toggleMappaPanel());
+  document.getElementById('mp-close')?.addEventListener('click',()=>toggleMappaPanel(false));
+
+  // Listener sede/mappa — usa handler che accede a S.sedi al momento del click
   const mpSede=document.getElementById('mp-sede');
   const mpMappa=document.getElementById('mp-mappa');
-  const mpBody=document.getElementById('mappa-panel-body');
-
-  const popolaSedi=()=>{
-    mpSede.innerHTML='<option value="">Seleziona sede…</option>'+
-      sediOrdinate().map(s=>`<option value="${s.id}"${S._mappaPanel.sedeId===s.id?' selected':''}>${esc(s.nome)}</option>`).join('');
-  };
-  popolaSedi();
-
-  const aggiornaMappa=()=>{
-    const sedeId=mpSede.value;
-    const mappeS=S.mappe.filter(m=>m.sede_id===sedeId);
-    mpMappa.innerHTML='<option value="">— Piano —</option>'+
-      mappeS.map(m=>`<option value="${m.id}"${S._mappaPanel.mappaId===m.id?' selected':''}>${esc(m.nome)}</option>`).join('');
-    if(!S._mappaPanel.mappaId&&mappeS.length) {
-      mpMappa.value=mappeS[0].id;
-      S._mappaPanel.mappaId=mappeS[0].id;
-    }
-    renderMappaPannello();
-  };
 
   mpSede.addEventListener('change',()=>{
     S._mappaPanel.sedeId=mpSede.value;
     S._mappaPanel.mappaId='';
     S._mappaPanel.highlightId='';
-    aggiornaMappa();
+    popolaMappeSede(mpSede.value);
+    renderMappaPannello();
   });
   mpMappa.addEventListener('change',()=>{
     S._mappaPanel.mappaId=mpMappa.value;
     renderMappaPannello();
   });
-  document.getElementById('mp-close').addEventListener('click',()=>toggleMappaPanel(false));
-  tab.addEventListener('click',()=>toggleMappaPanel());
+}
 
-  if(S._mappaPanel.sedeId) aggiornaMappa();
+function popolaSediPanel(){
+  const mpSede=document.getElementById('mp-sede');
+  if(!mpSede) return;
+  mpSede.innerHTML='<option value="">Seleziona sede…</option>'+
+    sediOrdinate().map(s=>`<option value="${s.id}"${S._mappaPanel.sedeId===s.id?' selected':''}>${esc(s.nome)}</option>`).join('');
+  if(S._mappaPanel.sedeId) popolaMappeSede(S._mappaPanel.sedeId);
+}
+
+function popolaMappeSede(sedeId){
+  const mpMappa=document.getElementById('mp-mappa');
+  if(!mpMappa) return;
+  const mappeS=S.mappe.filter(m=>m.sede_id===sedeId);
+  mpMappa.innerHTML='<option value="">— Piano —</option>'+
+    mappeS.map(m=>`<option value="${m.id}"${S._mappaPanel.mappaId===m.id?' selected':''}>${esc(m.nome)}</option>`).join('');
+  if(!S._mappaPanel.mappaId&&mappeS.length){
+    S._mappaPanel.mappaId=mappeS[0].id;
+    mpMappa.value=mappeS[0].id;
+  }
 }
 
 function toggleMappaPanel(force=null){
@@ -3155,32 +3167,21 @@ function toggleMappaPanel(force=null){
 }
 
 function openMappaPanelForAsset(assetId){
-  // Trova la mappa dell'asset
   const pos=S.assetMappe.find(m=>m.asset_id===assetId);
   if(pos){
     const mappa=S.mappe.find(m=>m.id===pos.mappa_id);
-    if(mappa){
-      S._mappaPanel.sedeId=mappa.sede_id;
-      S._mappaPanel.mappaId=mappa.id;
-    }
+    if(mappa){S._mappaPanel.sedeId=mappa.sede_id;S._mappaPanel.mappaId=mappa.id;}
   }else{
-    // Usa sede attuale
     const oggi=new Date().toISOString().slice(0,10);
     const ub=S.assetSedi.filter(x=>x.asset_id===assetId&&x.data_da<=oggi&&(!x.data_a||x.data_a>=oggi))[0];
     if(ub) S._mappaPanel.sedeId=ub.sede_id;
   }
   S._mappaPanel.highlightId=assetId;
-  // Aggiorna selects
   const mpSede=document.getElementById('mp-sede');
-  const mpMappa=document.getElementById('mp-mappa');
   if(mpSede) mpSede.value=S._mappaPanel.sedeId;
-  if(mpMappa){
-    const mappeS=S.mappe.filter(m=>m.sede_id===S._mappaPanel.sedeId);
-    mpMappa.innerHTML='<option value="">— Piano —</option>'+
-      mappeS.map(m=>`<option value="${m.id}"${S._mappaPanel.mappaId===m.id?' selected':''}>${esc(m.nome)}</option>`).join('');
-    if(S._mappaPanel.mappaId) mpMappa.value=S._mappaPanel.mappaId;
-    else if(mappeS.length){mpMappa.value=mappeS[0].id;S._mappaPanel.mappaId=mappeS[0].id;}
-  }
+  popolaMappeSede(S._mappaPanel.sedeId);
+  const mpMappa=document.getElementById('mp-mappa');
+  if(mpMappa&&S._mappaPanel.mappaId) mpMappa.value=S._mappaPanel.mappaId;
   toggleMappaPanel(true);
   renderMappaPannello();
 }
@@ -4150,7 +4151,7 @@ async function doLogin(){
     await loadAll();
     $('lp').classList.add('hid'); $('app').classList.remove('hid');
     renderSidebar(); goPage('griglia');
-    setTimeout(initMappaPanel,200);
+    popolaSediPanel();
     logAct('login',`Accesso effettuato — ${S.user.cognome} ${S.user.nome}`);
     toast(`Benvenuto, ${S.user.nome}! ✅`);
   }catch(e){
