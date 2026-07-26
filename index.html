@@ -3257,38 +3257,38 @@ function renderMappaPannello(){
     });
   });
 
-  // Drag & drop segnalini (solo admin/it)
+  // Drag & drop (solo admin/it)
   if(canEdit){
+    // Setup draggable per pin asset
     mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
       pin.setAttribute('draggable','true');
       pin.addEventListener('dragstart',e=>{
         const img=mpBody.querySelector('#mappa-img');
         if(img){
           const r=img.getBoundingClientRect();
-          const pid=pin.dataset.pid,aid=pin.dataset.aid;
-          const pos=S.assetMappe.find(p=>p.id===pid);
-          if(pos) _dragOffset={ox:e.clientX-r.left-(pos.x/100*r.width), oy:e.clientY-r.top-(pos.y/100*r.height)};
-          else _dragOffset={ox:0,oy:0};
+          const pos=S.assetMappe.find(p=>p.id===pin.dataset.pid);
+          _dragOffset=pos
+            ?{ox:e.clientX-r.left-(pos.x/100*r.width), oy:e.clientY-r.top-(pos.y/100*r.height)}
+            :{ox:0,oy:0};
         }
         pin.dataset.dragging='0';
         e.dataTransfer.setData('text/plain',pin.dataset.pid+'|'+pin.dataset.aid);
         pin.classList.add('dragging');
       });
-      pin.addEventListener('dragend',()=>{pin.classList.remove('dragging');});
+      pin.addEventListener('dragend',()=>pin.classList.remove('dragging'));
     });
 
-  // Drag & drop testi e pin: salva offset punto di presa
-  if(canEdit){
+    // Setup draggable per testi
     mpBody.querySelectorAll('.mappa-text').forEach(el=>{
       el.setAttribute('draggable','true');
       el.addEventListener('dragstart',e=>{
         const img=mpBody.querySelector('#mappa-img');
         if(img){
           const r=img.getBoundingClientRect();
-          _dragOffset={ox:((e.clientX-r.left)/r.width)*100, oy:((e.clientY-r.top)/r.height)*100};
           const t=S.mappeTesti.find(x=>x.id===el.dataset.tid);
-          if(t) _dragOffset={ox:e.clientX-r.left-(t.x/100*r.width), oy:e.clientY-r.top-(t.y/100*r.height)};
-          else _dragOffset={ox:0,oy:0};
+          _dragOffset=t
+            ?{ox:e.clientX-r.left-(t.x/100*r.width), oy:e.clientY-r.top-(t.y/100*r.height)}
+            :{ox:0,oy:0};
         }
         e.dataTransfer.setData('text/plain','TEXT|'+el.dataset.tid);
         el.classList.add('dragging');
@@ -3296,123 +3296,86 @@ function renderMappaPannello(){
       el.addEventListener('dragend',()=>el.classList.remove('dragging'));
     });
 
-
-  // Helper coordinate precise su immagine (considera scroll del pannello)
-  const getImgCoords=(evt,img)=>{const r=img.getBoundingClientRect();return {x:Math.min(100,Math.max(0,((evt.clientX-r.left)/r.width)*100)),y:Math.min(100,Math.max(0,((evt.clientY-r.top)/r.height)*100))};};let _dragOffset={ox:0,oy:0};
-  // Drag drop su wrap (aggiorna anche testi)
-  const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
-  const imgDrop=mpBody.querySelector('#mappa-img');
-  if(wrapDrop&&imgDrop&&canEdit){
-    wrapDrop.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
-    wrapDrop.addEventListener('drop',async e=>{
-      e.preventDefault();
-      const data=e.dataTransfer.getData('text/plain');
-      if(!data) return;
-      const rect2=imgDrop.getBoundingClientRect();
-      const x=Math.min(100,Math.max(0,((e.clientX-rect2.left-_dragOffset.ox)/rect2.width)*100));
-      const y=Math.min(100,Math.max(0,((e.clientY-rect2.top-_dragOffset.oy)/rect2.height)*100));
-      if(data.startsWith('TEXT|')){
-        const tid=data.slice(5);
-        await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{x,y}});
-        S.mappeTesti=S.mappeTesti.map(t=>t.id===tid?{...t,x,y}:t);
-        renderMappaPannello();
-      }else{
-        const [pid,aid]=data.split('|');
-        const existing=S.assetMappe.find(p=>p.id===pid);
-        if(existing){
-          await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
-          S.assetMappe=S.assetMappe.map(p=>p.id===pid?{...p,x,y}:p);
+    // Drop handler unificato
+    const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
+    const imgDrop=mpBody.querySelector('#mappa-img');
+    if(wrapDrop&&imgDrop){
+      wrapDrop.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+      wrapDrop.addEventListener('drop',async e=>{
+        e.preventDefault();
+        const data=e.dataTransfer.getData('text/plain');
+        if(!data) return;
+        const r=imgDrop.getBoundingClientRect();
+        const x=Math.min(100,Math.max(0,((e.clientX-r.left-_dragOffset.ox)/r.width)*100));
+        const y=Math.min(100,Math.max(0,((e.clientY-r.top-_dragOffset.oy)/r.height)*100));
+        if(data.startsWith('TEXT|')){
+          const tid=data.slice(5);
+          await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{x,y}});
+          S.mappeTesti=S.mappeTesti.map(t=>t.id===tid?{...t,x,y}:t);
+          renderMappaPannello();
         }else{
-          const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
-          S.assetMappe.push(np);
-        }
-        renderMappaPannello();
-      }
-    });
-  }
-
-  // Gestione testi
-  if(canEdit){
-    mpBody.querySelectorAll('[data-text-edit]').forEach(btn=>{
-      btn.addEventListener('click',async e=>{
-        e.stopPropagation();
-        const t=S.mappeTesti.find(x=>x.id===btn.dataset.textEdit);
-        if(!t) return;
-        const nuovoTesto=prompt('Modifica testo:',t.testo);
-        if(nuovoTesto===null) return;
-        const dim=prompt('Dimensione font (default 24):',t.font_size||24);
-        const payload={testo:nuovoTesto,font_size:parseInt(dim)||24};
-        await db('PATCH',T('mappe_testi'),{flt:`id=eq.${t.id}`,body:payload});
-        S.mappeTesti=S.mappeTesti.map(x=>x.id===t.id?{...x,...payload}:x);
-        renderMappaPannello();
-      });
-    });
-    mpBody.querySelectorAll('[data-text-del]').forEach(btn=>{
-      btn.addEventListener('click',async e=>{
-        e.stopPropagation();
-        await db('DELETE',T('mappe_testi'),{flt:`id=eq.${btn.dataset.textDel}`});
-        S.mappeTesti=S.mappeTesti.filter(x=>x.id!==btn.dataset.textDel);
-        renderMappaPannello();
-      });
-    });
-  }
-
-  // Click mappa per aggiungere testo (modalit- testo)
-  const wrapEl=mpBody.querySelector('#mappa-img-wrap');
-  const imgEl=mpBody.querySelector('#mappa-img');
-  if(wrapEl&&imgEl&&canEdit){
-    wrapEl.addEventListener('click',async e=>{
-      if(e.target.closest('.mappa-pin')||e.target.closest('.mappa-text')||e.target.closest('[data-text-edit]')||e.target.closest('[data-text-del]')) return;
-      if(S._mappaPanel._textMode){
-        const {x,y}=getImgCoords(e,imgEl);
-        const testo=prompt('Testo da inserire:');
-        if(!testo) return;
-        const dim=prompt('Dimensione font (default 24):','24');
-        const [nt]=await db('POST',T('mappe_testi'),{body:{mappa_id:mappaId,testo,x,y,font_size:parseInt(dim)||24}});
-        S.mappeTesti.push(nt);
-        renderMappaPannello();
-        return;
-      }
-      // Modalit- posizionamento asset
-      if(!S._mappaPanel._placeMode) return;
-      const rect=imgEl.getBoundingClientRect();
-      const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
-      const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
-      S._mappaPanel._pendingPos={x,y};
-      const existing=new Set(S.assetMappe.filter(p=>p.mappa_id===mappaId).map(p=>p.asset_id));
-      const disponibili=S.asset.filter(a=>!existing.has(a.id));
-      if(!disponibili.length){toast('Tutti gli asset sono già posizionati su questa mappa','err');return;}
-      openM('📍 Posiziona asset',`
-        <div style="font-size:13px;color:var(--g500);margin-bottom:10px">Seleziona l'asset da posizionare in questo punto</div>
-        <input class="fi" id="place-search" placeholder="🔍 Cerca…" style="margin-bottom:8px"/>
-        <div id="place-list" style="max-height:240px;overflow-y:auto;border:1px solid var(--g200);border-radius:var(--rsm)">
-          ${disponibili.map(a=>`<div data-place-id="${a.id}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--g100);font-size:13px" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
-            <strong>${esc(a.nome)}</strong>${a.codice?` <span style="color:var(--g500);font-size:11px;font-family:monospace">${esc(a.codice)}</span>`:''}
-          </div>`).join('')}
-        </div>`,
-      [{l:'Annulla',c:'bs',a:closeM}]);
-      setTimeout(()=>{
-        $('place-search')?.addEventListener('input',e2=>{
-          const q=e2.target.value.toLowerCase();
-          document.querySelectorAll('[data-place-id]').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});
-        });
-        document.querySelectorAll('[data-place-id]').forEach(el=>{
-          el.addEventListener('click',async()=>{
-            const aid=el.dataset.placeId;
-            const {x,y}=S._mappaPanel._pendingPos;
+          const [pid,aid]=data.split('|');
+          const existing=S.assetMappe.find(p=>p.id===pid);
+          if(existing){
+            await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
+            S.assetMappe=S.assetMappe.map(p=>p.id===pid?{...p,x,y}:p);
+          }else{
             const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
             S.assetMappe.push(np);
-            closeM();
-            S._mappaPanel._placeMode=false;
-            const pb2=document.getElementById('mp-place-btn');
-            if(pb2){pb2.textContent='+ Posiziona asset';pb2.style.background='';pb2.style.color='';}
-            renderMappaPannello();toast('Asset posizionato ✅');
+          }
+          renderMappaPannello();
+        }
+      });
+
+      // Click mappa per aggiungere testo o posizionare asset
+      wrapDrop.addEventListener('click',async e=>{
+        if(e.target.closest('.mappa-pin')||e.target.closest('.mappa-text')) return;
+        const r=imgDrop.getBoundingClientRect();
+        const x=Math.min(100,Math.max(0,((e.clientX-r.left)/r.width)*100));
+        const y=Math.min(100,Math.max(0,((e.clientY-r.top)/r.height)*100));
+        if(S._mappaPanel._textMode){
+          const testo=prompt('Testo da inserire:');
+          if(!testo) return;
+          const dim=prompt('Dimensione font (default 24):','24');
+          const [nt]=await db('POST',T('mappe_testi'),{body:{mappa_id:mappaId,testo,x,y,font_size:parseInt(dim)||24}});
+          S.mappeTesti.push(nt);
+          renderMappaPannello();
+          return;
+        }
+        if(!S._mappaPanel._placeMode) return;
+        S._mappaPanel._pendingPos={x,y};
+        const existing=new Set(S.assetMappe.filter(p=>p.mappa_id===mappaId).map(p=>p.asset_id));
+        const disponibili=S.asset.filter(a=>!existing.has(a.id));
+        if(!disponibili.length){toast('Tutti gli asset sono già posizionati su questa mappa','err');return;}
+        openM('Posiziona asset',`
+          <input class="fi" id="place-search" placeholder="Cerca..." style="margin-bottom:8px"/>
+          <div id="place-list" style="max-height:240px;overflow-y:auto;border:1px solid var(--g200);border-radius:var(--rsm)">
+            ${disponibili.map(a=>`<div data-place-id="${a.id}" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--g100);font-size:13px" onmouseover="this.style.background='var(--g50)'" onmouseout="this.style.background=''">
+              <strong>${esc(a.nome)}</strong>${a.codice?` <span style="color:var(--g500);font-size:11px;font-family:monospace">${esc(a.codice)}</span>`:''}
+            </div>`).join('')}
+          </div>`,
+        [{l:'Annulla',c:'bs',a:closeM}]);
+        setTimeout(()=>{
+          $('place-search')?.addEventListener('input',e2=>{
+            const q=e2.target.value.toLowerCase();
+            document.querySelectorAll('[data-place-id]').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});
           });
-        });
-      },50);
-    });
-  }
-  }
+          document.querySelectorAll('[data-place-id]').forEach(el=>{
+            el.addEventListener('click',async()=>{
+              const aid=el.dataset.placeId;
+              const {x,y}=S._mappaPanel._pendingPos;
+              const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
+              S.assetMappe.push(np);
+              closeM();
+              S._mappaPanel._placeMode=false;
+              const pb2=$('mp-place-btn');
+              if(pb2){pb2.textContent='+ Posiziona asset';pb2.style.background='';pb2.style.color='';}
+              renderMappaPannello();toast('Asset posizionato');
+            });
+          });
+        },50);
+      });
+    }
   }
 }
 
