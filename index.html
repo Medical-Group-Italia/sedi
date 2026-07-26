@@ -324,7 +324,7 @@ const NAV = [...NAV_MAIN, ...NAV_ADMIN.map(n=>({...n,r:['admin']}))];
    UTILITIES
 ══════════════════════════════════════════ */
 const $   = id => document.getElementById(id);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\$\{/g,'&#36;{');
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,11));
 
 function fmt(d){
