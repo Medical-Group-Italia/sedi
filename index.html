@@ -223,22 +223,22 @@ input:checked+.tsl{background:var(--verde)}
 input:checked+.tsl::after{transform:translateX(16px)}
 
 /* ── Mappa pannello laterale ── */
-#mappa-panel{position:fixed;display:none;top:56px;right:0;width:520px;max-width:90vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column}
-#mappa-panel.open{transform:translateX(0)}
-#mappa-tab{position:fixed;top:50%;right:0;display:none;transform:translateY(-50%);z-index:201;writing-mode:vertical-rl;background:var(--verde);color:#fff;padding:12px 6px;border-radius:6px 0 0 6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;transition:right .3s ease;user-select:none}
+#mappa-panel{position:fixed;top:56px;right:0;width:80vw;height:calc(100vh - 56px);background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.12);z-index:200;transform:translateX(calc(80vw + 10px));transition:transform .3s ease;display:flex;flex-direction:column;visibility:hidden}
+#mappa-panel.open{transform:translateX(0);visibility:visible}
+#mappa-tab{position:fixed;top:50%;right:0;display:none;transform:translateY(-50%);z-index:202;writing-mode:vertical-rl;background:var(--verde);color:#fff;padding:12px 6px;border-radius:6px 0 0 6px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;transition:right .3s ease;user-select:none}
 #mappa-tab.open{right:80vw}
 @media(max-width:600px){#mappa-tab.open{right:95vw}#mappa-panel{width:95vw}}
 #mappa-panel-head{padding:12px 14px;border-bottom:1px solid var(--g200);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
 #mappa-panel-body{flex:1;overflow:auto;position:relative;background:var(--g50)}
 .mappa-wrap{position:relative;display:inline-block;min-width:100%}
 .mappa-wrap img{display:block;max-width:100%;height:auto;user-select:none}
-.mappa-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10}
-.mappa-pin .pin-dot{width:28px;height:28px;border-radius:50%;background:var(--verde);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;transition:background .15s,transform .15s}
-.mappa-pin.highlight .pin-dot{background:#E74C3C;transform:scale(1.3)}
-.mappa-pin:hover .pin-dot{transform:scale(1.2)}
-.mappa-pin .pin-label{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#222;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s}
-.mappa-pin:hover .pin-label{opacity:1}
-.mappa-pin.dragging{opacity:.7;z-index:20}
+.mappa-pin{position:absolute;transform:translate(-50%,-50%);cursor:pointer;z-index:10}
+.mappa-pin .pin-tag{display:inline-flex;align-items:center;gap:4px;background:var(--verde);color:#fff;border-radius:12px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:background .15s,transform .15s;user-select:none}
+.mappa-pin.highlight .pin-tag{background:#E74C3C;transform:scale(1.1);box-shadow:0 3px 10px rgba(231,76,60,.4)}
+.mappa-pin:hover .pin-tag{transform:scale(1.05)}
+.mappa-pin .pin-tag .pin-x{opacity:.7;font-size:10px;margin-left:2px;line-height:1}
+.mappa-pin .pin-tag .pin-x:hover{opacity:1}
+.mappa-pin.dragging{opacity:.6;z-index:20}
 
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -3216,9 +3216,11 @@ function renderMappaPannello(){
     const utente=au?S.profili.find(u=>u.id===au.utente_id):null;
     const tooltip=`${esc(a.nome)}${utente?' · '+esc(utente.cognome+' '+utente.nome):''}`;
     return `<div class="mappa-pin${isHL?' highlight':''}" data-aid="${a.id}" data-pid="${p.id}"
-      style="left:${p.x}%;top:${p.y}%;position:absolute;transform:translate(-50%,-100%);cursor:${canEdit?'grab':'pointer'};z-index:${isHL?15:10}">
-      <div class="pin-dot" style="font-size:9px">${esc(label.slice(0,4))}</div>
-      <div class="pin-label">${tooltip}</div>
+      style="left:${p.x}%;top:${p.y}%;cursor:${canEdit?'grab':'pointer'}">
+      <div class="pin-tag">
+        <span>${esc(label)}</span>
+        ${canEdit?`<span class="pin-x" data-remove-pid="${p.id}" data-remove-aid="${a.id}" title="Rimuovi dalla mappa">✕</span>`:''}
+      </div>
     </div>`;
   }).join('');
 
@@ -3246,10 +3248,23 @@ function renderMappaPannello(){
     if(hlPin) setTimeout(()=>hlPin.scrollIntoView({block:'center',inline:'center'}),100);
   }
 
-  // Click su pin → apri modale asset
+  // Click su ✕ rimozione
+  mpBody.querySelectorAll('[data-remove-pid]').forEach(btn=>{
+    btn.addEventListener('click',async e=>{
+      e.stopPropagation();
+      const pid=btn.dataset.removePid,aid=btn.dataset.removeAid;
+      const a=S.asset.find(x=>x.id===aid);
+      openConf(`Rimuovere "${a?.nome||'asset'}" dalla mappa?`,async()=>{
+        await db('DELETE',T('asset_mappa'),{flt:`id=eq.${pid}`});
+        S.assetMappe=S.assetMappe.filter(x=>x.id!==pid);
+        renderMappaPannello();toast('Rimosso dalla mappa');
+      });
+    });
+  });
+  // Click su etichetta → apri modale asset
   mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
     pin.addEventListener('click',e=>{
-      if(pin.dataset.dragging==='1') return;
+      if(e.target.closest('[data-remove-pid]')) return;
       const a=S.asset.find(x=>x.id===pin.dataset.aid);
       if(a) openAssetModal(a);
     });
