@@ -240,7 +240,7 @@ input:checked+.tsl::after{transform:translateX(16px)}
 .mappa-pin .pin-tag .pin-x:hover{opacity:1}
 .mappa-pin.dragging{opacity:.6;z-index:20}
 .mappa-text{position:absolute;transform:translate(-50%,-50%);cursor:default;z-index:8;user-select:none}
-.mappa-text .text-label{background:transparent;color:#111;font-size:16px;font-weight:700;white-space:nowrap;text-shadow:1px 1px 0 #fff,-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff;line-height:1.2;padding:2px 4px}
+.mappa-text .text-label{background:transparent;color:#111;font-size:24px;font-weight:700;white-space:nowrap;text-shadow:1px 1px 0 #fff,-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff;line-height:1.2;padding:2px 4px}
 .mappa-text.editing .text-label{outline:2px dashed var(--verde);border-radius:3px}
 .mappa-text .text-actions{display:none;position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--g200);border-radius:6px;box-shadow:var(--sh-sm);padding:2px 4px;gap:4px;white-space:nowrap}
 .mappa-text:hover .text-actions{display:flex}
@@ -3317,18 +3317,39 @@ function renderMappaPannello(){
       pin.addEventListener('dragend',()=>{pin.classList.remove('dragging');});
     });
 
-    const wrap=mpBody.querySelector('#mappa-img-wrap');
-    const img=mpBody.querySelector('#mappa-img');
-    if(wrap&&img){
-      wrap.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
-      wrap.addEventListener('drop',async e=>{
-        e.preventDefault();
-        const data=e.dataTransfer.getData('text/plain');
-        if(!data) return;
+    {
+
+  // Drag & drop testi
+  if(canEdit){
+    mpBody.querySelectorAll('.mappa-text').forEach(el=>{
+      el.setAttribute('draggable','true');
+      el.addEventListener('dragstart',e=>{
+        e.dataTransfer.setData('text/plain','TEXT|'+el.dataset.tid);
+        el.classList.add('dragging');
+      });
+      el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+    });
+  }
+
+  // Drag drop su wrap (aggiorna anche testi)
+  const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
+  const imgDrop=mpBody.querySelector('#mappa-img');
+  if(wrapDrop&&imgDrop&&canEdit){
+    wrapDrop.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+    wrapDrop.addEventListener('drop',async e=>{
+      e.preventDefault();
+      const data=e.dataTransfer.getData('text/plain');
+      if(!data) return;
+      const rect=imgDrop.getBoundingClientRect();
+      const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
+      const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
+      if(data.startsWith('TEXT|')){
+        const tid=data.slice(5);
+        await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{x,y}});
+        S.mappeTesti=S.mappeTesti.map(t=>t.id===tid?{...t,x,y}:t);
+        renderMappaPannello();
+      }else{
         const [pid,aid]=data.split('|');
-        const rect=img.getBoundingClientRect();
-        const x=Math.min(100,Math.max(0,((e.clientX-rect.left)/rect.width)*100));
-        const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
         const existing=S.assetMappe.find(p=>p.id===pid);
         if(existing){
           await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
@@ -3338,7 +3359,9 @@ function renderMappaPannello(){
           S.assetMappe.push(np);
         }
         renderMappaPannello();
-      });
+      }
+    });
+  }
 
   // Gestione testi
   if(canEdit){
@@ -3349,8 +3372,8 @@ function renderMappaPannello(){
         if(!t) return;
         const nuovoTesto=prompt('Modifica testo:',t.testo);
         if(nuovoTesto===null) return;
-        const dim=prompt('Dimensione font (default 16):',t.font_size||16);
-        const payload={testo:nuovoTesto,font_size:parseInt(dim)||16};
+        const dim=prompt('Dimensione font (default 24):',t.font_size||24);
+        const payload={testo:nuovoTesto,font_size:parseInt(dim)||24};
         await db('PATCH',T('mappe_testi'),{flt:`id=eq.${t.id}`,body:payload});
         S.mappeTesti=S.mappeTesti.map(x=>x.id===t.id?{...x,...payload}:x);
         renderMappaPannello();
@@ -3378,8 +3401,8 @@ function renderMappaPannello(){
         const y=Math.min(100,Math.max(0,((e.clientY-rect.top)/rect.height)*100));
         const testo=prompt('Testo da inserire:');
         if(!testo) return;
-        const dim=prompt('Dimensione font (default 16):','16');
-        const [nt]=await db('POST',T('mappe_testi'),{body:{mappa_id:mappaId,testo,x,y,font_size:parseInt(dim)||16}});
+        const dim=prompt('Dimensione font (default 24):','24');
+        const [nt]=await db('POST',T('mappe_testi'),{body:{mappa_id:mappaId,testo,x,y,font_size:parseInt(dim)||24}});
         S.mappeTesti.push(nt);
         renderMappaPannello();
         return;
