@@ -1522,7 +1522,7 @@ function openAssetModal(a){
         </select>
       </div>
       <div class="fg"><div class="fl">Sottocategoria</div>
-        <select class="fse" id="am-sub">
+        <select class="fse" id="am-sub"${(()=>{const hasCat=!!S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id;return hasCat?'':' disabled';})()} >
           <option value="">— Nessuna —</option>
           ${(()=>{const catId=S.assetSubcat.find(sc=>sc.id===a?.sottocategoria_id)?.categoria_id||'';return [...S.assetSubcat.filter(sc=>!catId||sc.categoria_id===catId)].sort((a,b)=>a.nome.localeCompare(b.nome)).map(sc=>`<option value="${sc.id}"${sc.id===a?.sottocategoria_id?' selected':''}>${esc(sc.nome)}</option>`).join('');})()}
         </select>
@@ -2688,7 +2688,41 @@ function renderProduttori(pb){
     }).join('')}
     </tbody></table>`}
   </div></div>`;
-  $('prod-search').addEventListener('input',e=>{f.search=e.target.value;renderProduttori(pb);});
+  $('prod-search').addEventListener('input',e=>{
+    f.search=e.target.value;
+    // Aggiorna solo la tabella senza rirendere tutto
+    const filtered=[...S.assetProduttori].filter(p=>!f.search||p.nome.toLowerCase().includes(f.search.toLowerCase())).sort((a,b)=>a.nome.localeCompare(b.nome));
+    const tw=pb.querySelector('table');
+    if(tw){
+      const tbody=tw.querySelector('tbody');
+      if(tbody) tbody.innerHTML=filtered.map(p=>{
+        const catNames=(p.categorie_ids&&p.categorie_ids.length)?p.categorie_ids.map(cid=>S.assetCat.find(c=>c.id===cid)?.nome).filter(Boolean).join(', '):'Tutte';
+        const isAdm2=['admin','asset','it'].includes(S.user?.ruolo);
+        return `<tr>
+          <td class="tn">${esc(p.nome)}</td>
+          <td style="font-size:12px;color:var(--g500)">${esc(catNames)}</td>
+          <td style="font-size:12px;color:var(--g500)">${esc(p.note||'')}</td>
+          <td><span class="bg bg-usr">${S.asset.filter(a=>a.produttore_id===p.id).length} asset</span></td>
+          ${isAdm2?`<td><div class="tda">
+            <button class="btn bs bsm" data-prode="${p.id}">✏</button>
+            <button class="btn bd bsm" data-prodd="${p.id}">🗑</button>
+          </div></td>`:''}
+        </tr>`;
+      }).join('');
+      // Re-bind eventi
+      pb.querySelectorAll('[data-prode]').forEach(b=>b.addEventListener('click',()=>openProduttoreModal(S.assetProduttori.find(x=>x.id===b.dataset.prode))));
+      pb.querySelectorAll('[data-prodd]').forEach(b=>b.addEventListener('click',()=>{
+        const p=S.assetProduttori.find(x=>x.id===b.dataset.prodd);
+        openConf(`Eliminare "${p?.nome}"?`,async()=>{
+          await db('DELETE',T('asset_produttori'),{flt:`id=eq.${b.dataset.prodd}`});
+          S.assetProduttori=S.assetProduttori.filter(x=>x.id!==b.dataset.prodd); renderPage(); toast('Eliminato');
+        });
+      }));
+    }
+    // Mantieni focus
+    const inp=$('prod-search');
+    if(inp&&document.activeElement!==inp){const v=inp.value;inp.focus();inp.setSelectionRange(v.length,v.length);}
+  });
   $('prod-add')?.addEventListener('click',()=>openProduttoreModal(null));
   pb.querySelectorAll('[data-prode]').forEach(b=>b.addEventListener('click',()=>openProduttoreModal(S.assetProduttori.find(x=>x.id===b.dataset.prode))));
   pb.querySelectorAll('[data-prodd]').forEach(b=>b.addEventListener('click',()=>{
@@ -3515,73 +3549,98 @@ async function checkEmailLive(inputEl,infoEl,pwdWrap,fnName){
   }
 }
 const PWD_WARN_HTML='<div style="margin-top:6px;padding:8px 12px;border-radius:var(--rsm);background:#FEF0E3;border:1px solid #f5c28a;font-size:12px;color:#7a3800;font-weight:600">\u26a0 Attenzione: questa password sar\u00e0 valida per tutti i tool che usano lo stesso account.</div>';
-function renderUtentiTable(list,pb){
-  const el=document.getElementById('u-table-wrap');if(!el)return;
-  if(!list.length){el.innerHTML='<div class="emp"><div class="emi">👥</div><div class="emt">Nessun utente trovato</div></div>';return;}
-  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT']};
-  el.innerHTML=`<table class="dt"><thead><tr><th>Utente</th><th>Ruolo</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
-  ${list.map(u=>{const[rc,rl]=RBADGE[u.ruolo]||['bg-usr',u.ruolo];return`<tr>
-    <td><div class="tn">${esc(u.cognome+' '+u.nome)}</div><div class="ts">${esc(u.email||'')}</div></td>
-    <td><span class="bg ${rc}">${rl}</span></td>
-    <td><span class="bg ${u.attivo?'bg-on':'bg-off'}">${u.attivo?'&#9679; Attivo':'&#9675; Inattivo'}</span></td>
-    <td><div class="tda">
-      <button class="btn bs bsm" data-ue="${u.id}">&#9998; Modifica</button>
-      ${u.id!==S.user?.id?`<button class="btn bd bsm" data-ud="${u.id}">&#128465; Rimuovi</button>`:''}
-    </div></td>
-  </tr>`;}).join('')}
-  </tbody></table>`;
-  el.querySelectorAll('[data-ue]').forEach(b=>b.addEventListener('click',()=>openUtenteModal(S.profili.find(x=>x.id===b.dataset.ue))));
-  el.querySelectorAll('[data-ud]').forEach(b=>b.addEventListener('click',()=>{
-    const u=S.profili.find(x=>x.id===b.dataset.ud);
-    openConf(`Rimuovere il profilo di "${u?.nome} ${u?.cognome}"?\n\nL'account rimane attivo sugli altri tool.`,async()=>{
-      const res=await fetch(`${CFG.FN}/sedi-manage-user`,{method:'POST',
-        headers:{'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
-        body:JSON.stringify({action:'delete_profile',user_id:b.dataset.ud})});
-      const data=await res.json();
-      if(!data.ok) throw new Error(data.error||'Errore');
-      S.profili=S.profili.filter(x=>x.id!==b.dataset.ud);renderPage();toast('Profilo rimosso');
-    });
-  }));
-}
-
 function renderUtenti(pb){
+  if(!S._uState) S._uState={search:'',ruolo:'',stato:'',sort:'cognome',sortDir:1,page:0};
+  const st=S._uState;
+  const PAGE=20;
+  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT']};
+  const isAdm=S.user?.ruolo==='admin';
+
+  const thS=(col,lbl)=>`<th style="cursor:pointer;user-select:none" data-usort="${col}">${lbl}${st.sort===col?(st.sortDir===1?' ↑':' ↓'):''}</th>`;
+
+  const getFiltered=()=>[...S.profili]
+    .filter(u=>!st.search||`${u.cognome} ${u.nome} ${u.email}`.toLowerCase().includes(st.search))
+    .filter(u=>!st.ruolo||u.ruolo===st.ruolo)
+    .filter(u=>st.stato===''||(st.stato==='1'?u.attivo!==false:u.attivo===false))
+    .sort((a,b)=>{
+      const va=st.sort==='ruolo'?a.ruolo:(st.sort==='stato'?String(a.attivo!==false):a.cognome+' '+a.nome);
+      const vb=st.sort==='ruolo'?b.ruolo:(st.sort==='stato'?String(b.attivo!==false):b.cognome+' '+b.nome);
+      return st.sortDir*va.localeCompare(vb);
+    });
+
+  const renderTable=()=>{
+    const fl=getFiltered();
+    const pages=Math.max(1,Math.ceil(fl.length/PAGE));
+    if(st.page>=pages) st.page=pages-1;
+    const slice=fl.slice(st.page*PAGE,(st.page+1)*PAGE);
+    const wrap=$('u-table-wrap'); if(!wrap) return;
+    wrap.innerHTML=!fl.length
+      ?'<div class="emp"><div class="emi">👥</div><div class="emt">Nessun utente trovato</div></div>'
+      :`<div style="font-size:12px;color:var(--g500);padding:8px 0 4px">${fl.length} utenti · pagina ${st.page+1}/${pages}</div>
+      <table class="dt"><thead><tr>
+        ${thS('cognome','Utente')}${thS('ruolo','Ruolo')}${thS('stato','Stato')}<th>Azioni</th>
+      </tr></thead><tbody>
+      ${slice.map(u=>{const[rc,rl]=RBADGE[u.ruolo]||['bg-usr',u.ruolo];return`<tr>
+        <td><div class="tn">${esc(u.cognome+' '+u.nome)}</div><div class="ts">${esc(u.email||'')}</div></td>
+        <td><span class="bg ${rc}">${rl}</span></td>
+        <td><span class="bg ${u.attivo?'bg-on':'bg-off'}">${u.attivo?'Attivo':'Inattivo'}</span></td>
+        <td><div class="tda">
+          <button class="btn bs bsm" data-ue="${u.id}">✏ Modifica</button>
+          ${isAdm&&u.id!==S.user?.id?`<button class="btn bd bsm" data-ud="${u.id}">🗑 Rimuovi</button>`:''}
+        </div></td>
+      </tr>`;}).join('')}
+      </tbody></table>
+      ${pages>1?`<div style="display:flex;align-items:center;gap:8px;margin-top:12px;justify-content:center">
+        <button class="bic" id="u-prev" ${st.page===0?'disabled style="opacity:.4"':''}>◀</button>
+        <span style="font-size:13px;color:var(--g500)">${st.page+1} / ${pages}</span>
+        <button class="bic" id="u-next" ${st.page>=pages-1?'disabled style="opacity:.4"':''}>▶</button>
+      </div>`:''}`;
+    wrap.querySelectorAll('[data-ue]').forEach(b=>b.addEventListener('click',()=>openUtenteModal(S.profili.find(x=>x.id===b.dataset.ue))));
+    wrap.querySelectorAll('[data-ud]').forEach(b=>b.addEventListener('click',()=>{
+      const u=S.profili.find(x=>x.id===b.dataset.ud);
+      openConf(`Rimuovere il profilo di "${u?.nome} ${u?.cognome}"?\n\nL'account rimane attivo sugli altri tool.`,async()=>{
+        const res=await fetch(`${CFG.FN}/sedi-manage-user`,{method:'POST',
+          headers:{'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
+          body:JSON.stringify({action:'delete_profile',user_id:b.dataset.ud})});
+        const data=await res.json();
+        if(!data.ok) throw new Error(data.error||'Errore');
+        S.profili=S.profili.filter(x=>x.id!==b.dataset.ud);renderTable();toast('Profilo rimosso');
+      });
+    }));
+    wrap.querySelectorAll('[data-usort]').forEach(th=>th.addEventListener('click',()=>{
+      if(st.sort===th.dataset.usort) st.sortDir*=-1; else{st.sort=th.dataset.usort;st.sortDir=1;}
+      st.page=0; renderTable();
+    }));
+    $('u-prev')?.addEventListener('click',()=>{st.page--;renderTable();});
+    $('u-next')?.addEventListener('click',()=>{st.page++;renderTable();});
+  };
+
   pb.innerHTML=`<div class="fian"><div class="card">
     <div class="ch"><span class="ct">👥 Utenti (${S.profili.length})</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input class="fi-sm" id="u-search" style="width:200px" placeholder="🔍 Cerca nome, cognome, email…"/>
+        <input class="fi-sm" id="u-search" style="width:200px" placeholder="🔍 Cerca…" value="${esc(st.search)}"/>
         <select class="fi-sm" id="u-ruolo">
           <option value="">Tutti i ruoli</option>
-          <option value="admin">Admin</option>
-          <option value="it">IT</option>
-          <option value="asset">Asset</option>
-          <option value="utente">Utente</option>
+          <option value="admin"${st.ruolo==='admin'?' selected':''}>Admin</option>
+          <option value="it"${st.ruolo==='it'?' selected':''}>IT</option>
+          <option value="asset"${st.ruolo==='asset'?' selected':''}>Asset</option>
+          <option value="utente"${st.ruolo==='utente'?' selected':''}>Utente</option>
         </select>
         <select class="fi-sm" id="u-stato">
           <option value="">Tutti gli stati</option>
-          <option value="1">Attivi</option>
-          <option value="0">Disattivati</option>
+          <option value="1"${st.stato==='1'?' selected':''}>Attivi</option>
+          <option value="0"${st.stato==='0'?' selected':''}>Disattivati</option>
         </select>
-        <button class="btn bpg bsm" id="u-add">+ Nuovo utente</button>
+        ${isAdm?`<button class="btn bpg bsm" id="u-add">+ Nuovo utente</button>`:''}
       </div>
     </div>
     <div id="u-table-wrap"></div>
   </div></div>`;
-  const render=()=>{
-    const q=($('u-search').value||'').toLowerCase();
-    const ruoloF=$('u-ruolo').value;
-    const statoF=$('u-stato').value;
-    const fl=[...S.profili]
-      .filter(u=>!q||`${u.cognome} ${u.nome} ${u.email}`.toLowerCase().includes(q))
-      .filter(u=>!ruoloF||u.ruolo===ruoloF)
-      .filter(u=>statoF===''||(statoF==='1'?u.attivo!==false:u.attivo===false))
-      .sort((a,b)=>a.cognome.localeCompare(b.cognome));
-    renderUtentiTable(fl,pb);
-  };
-  render();
-  $('u-search').addEventListener('input',render);
-  $('u-ruolo').addEventListener('change',render);
-  $('u-stato').addEventListener('change',render);
-  document.getElementById('u-add').addEventListener('click',()=>openUtenteModal(null));
+  renderTable();
+  $('u-search').addEventListener('input',e=>{st.search=e.target.value.toLowerCase();st.page=0;renderTable();});
+  $('u-ruolo').addEventListener('change',e=>{st.ruolo=e.target.value;st.page=0;renderTable();});
+  $('u-stato').addEventListener('change',e=>{st.stato=e.target.value;st.page=0;renderTable();});
+  $('u-add')?.addEventListener('click',()=>openUtenteModal(null));
 }
 
 function openUtenteModal(u){
