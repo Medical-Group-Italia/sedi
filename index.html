@@ -168,8 +168,8 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 #map-sidebar.collapsed{width:0}
 #map-sidebar-inner{width:340px;flex-shrink:0;overflow-y:auto;padding:16px;height:100%}
 /* Rimuovi la punta dei popup Leaflet */
-.leaflet-popup-tip-container{display:none!important}
-.leaflet-popup-content-wrapper{border-radius:var(--r)!important;box-shadow:var(--sh-md)!important}
+.leaflet-popup-tip-container{display:block}.leaflet-popup-tip{background:var(--verde,#9DBF60)}
+.leaflet-popup-content-wrapper{border-radius:var(--r)!important;box-shadow:var(--sh-md)!important;padding:0!important;overflow:hidden;border:none!important}
 /* toggle: posizionato assoluto in map-page, animato con right */
 #map-sidebar-toggle{
   position:absolute;top:50%;right:340px;transform:translateY(-50%);
@@ -1022,8 +1022,11 @@ function renderMappa(pb){
   }).addTo(map);
 
   const greenIcon=L.divIcon({
-    html:`<div style="width:22px;height:22px;border-radius:50%;background:#9DBF60;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`,
-    iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-14],className:''
+    html:`<div style="display:flex;flex-direction:column;align-items:center;width:22px">
+      <div style="width:22px;height:22px;border-radius:50%;background:#9DBF60;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>
+      <div style="width:3px;height:8px;background:#9DBF60;margin-top:-1px"></div>
+    </div>`,
+    iconSize:[22,30],iconAnchor:[11,30],popupAnchor:[0,-32],className:''
   });
   S.mappa._icon=greenIcon;
 
@@ -1085,12 +1088,9 @@ function updateMapMarkers(){
   sediConCoord.forEach((sede,idx)=>{
     if(!S.mappa.markers[sede.id]){
       const marker=L.marker([sede.lat,sede.lng],{icon:S.mappa._icon}).addTo(map);
-      // offset per evitare sovrapposizioni: alterna in base all'indice
-      const offsets=[[0,-5],[160,-5],[-160,-5],[0,-120],[160,-120],[-160,-120]];
-      const off=offsets[idx%offsets.length];
       const popup=L.popup({
         autoClose:false,closeOnClick:false,
-        maxWidth:280,offset:L.point(off[0],off[1])
+        maxWidth:300,offset:L.point(0,0)
       });
       popup.setContent(buildPopupContent(sede));
       marker.on('click',function(){
