@@ -4227,7 +4227,9 @@ function openConf(msg,onOk){
   ]);
 }
 $('mcls').addEventListener('click',closeM);
-$('mov').addEventListener('click',e=>{if(e.target===$('mov'))closeM();});
+let _movMousedownOnOverlay=false;
+$('mov').addEventListener('mousedown',e=>{_movMousedownOnOverlay=e.target===$('mov');});
+$('mov').addEventListener('click',e=>{if(e.target===$('mov')&&_movMousedownOnOverlay)closeM();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
 
 /* AUTH */
