@@ -2296,7 +2296,46 @@ function renderConvenzioni(pb){
       </tbody></table>`}
   </div></div>`;
 
-  $('conf-search').addEventListener('input',e=>{f.search=e.target.value;renderPage();});
+  const confRender=()=>{
+    const q=(f.search||'').toLowerCase();
+    const rfl=S.convenzioni.filter(con=>{
+      if(q&&!((con.nome||'').toLowerCase().includes(q)||(con.note||'').toLowerCase().includes(q))) return false;
+      if(f.sedeId&&con.sede_id!==f.sedeId) return false;
+      return true;
+    }).sort((a,b)=>{
+      if(f.sort==='giorni') return (giorniAllaScadenza(a.scadenza?new Date(a.scadenza+'T00:00:00'):null)??99999)-(giorniAllaScadenza(b.scadenza?new Date(b.scadenza+'T00:00:00'):null)??99999);
+      return (a.nome||'').localeCompare(b.nome||'');
+    });
+    const tbody=document.querySelector('#conf-table-wrap tbody');
+    if(!tbody){renderPage();return;}
+    tbody.innerHTML=rfl.map(con=>{
+      const scad=con.scadenza?new Date(con.scadenza+'T00:00:00'):null;
+      const giorni=giorniAllaScadenza(scad);
+      const sede=S.sedi.find(s=>s.id===con.sede_id);
+      const isAdm=S.user?.ruolo==='admin';
+      return `<tr style="${scadenzaStyle(giorni,con.alert_giorni||60)}">
+        <td><div class="tn">${esc(con.nome)}</div>${con.note?`<div class="ts">${esc(con.note)}</div>`:''}</td>
+        <td style="font-size:12px">${esc(sede?.nome||'—')}</td>
+        <td>${fmtDate(con.data_stipula)}</td>
+        <td>${fmtDate(con.scadenza)}</td>
+        <td>${scadenzaBadge(giorni)}</td>
+        ${isAdm?`<td><div class="tda">
+          <button class="btn bs bsm" data-cone="${con.id}">✏</button>
+          <button class="btn bd bsm" data-cond="${con.id}">🗑</button>
+        </div></td>`:''}
+      </tr>`;
+    }).join('');
+    // Rebind eventi
+    document.querySelectorAll('[data-cone]').forEach(b=>b.addEventListener('click',()=>openConvenzioneModal(S.convenzioni.find(x=>x.id===b.dataset.cone))));
+    document.querySelectorAll('[data-cond]').forEach(b=>b.addEventListener('click',()=>{
+      const con=S.convenzioni.find(x=>x.id===b.dataset.cond);
+      openConf(`Eliminare la convenzione "${con?.nome}"?`,async()=>{
+        await db('DELETE',T('convenzioni'),{flt:`id=eq.${b.dataset.cond}`});
+        S.convenzioni=S.convenzioni.filter(x=>x.id!==b.dataset.cond); renderPage(); toast('Eliminata');
+      });
+    }));
+  };
+  $('conf-search').addEventListener('input',e=>{f.search=e.target.value;confRender();});
   $('con-export')?.addEventListener('click',exportConvenzioni);
   pb.querySelectorAll('[data-sort]').forEach(th=>th.addEventListener('click',()=>{f.sort=th.dataset.sort;renderPage();}));
   if(isAdm){
@@ -3987,7 +4026,7 @@ function renderUtenti(pb){
     const wrap=$('u-table-wrap'); if(!wrap) return;
     wrap.innerHTML=!fl.length
       ?'<div class="emp"><div class="emi">👥</div><div class="emt">Nessun utente trovato</div></div>'
-      :`<div style="font-size:12px;color:var(--g500);padding:8px 0 4px">${fl.length} utenti · pagina ${st.page+1}/${pages}</div>
+      :`<div style="font-size:12px;color:var(--g500);padding:8px 16px 4px">${fl.length} utenti · pagina ${st.page+1}/${pages}</div>
       <table class="dt"><thead><tr>
         ${thS('cognome','Utente')}${thS('ruolo','Ruolo')}${thS('stato','Stato')}<th>Azioni</th>
       </tr></thead><tbody>
