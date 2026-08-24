@@ -321,7 +321,7 @@ const S = {
   aree: [], sedi: [], categorie: [], sottocategorie: [], campi: [], valori: [], profili: [], log: [],
   ragioni: [], fornitori: [], assetCat: [], assetSubcat: [], asset: [], assetSedi: [], costi: [], documenti: [],
   assetCaratteristiche: [], assetProduttori: [], assetNoleggiatori: [], assetUtenti: [],
-  mappe: [], assetMappe: [], mappeTestiOld: [], _mappaPanel:{open:false,sedeId:'',mappaId:'',highlightId:'',_placeMode:false,_textMode:false},
+  mappe: [], assetMappe: [], wifi: [], _mappaPanel:{open:false,sedeId:'',mappaId:'',highlightId:'',_placeMode:false,_textMode:false},
   verifiche: [], convenzioni: [], alertCfg: [], impianti: [], impiantiScadenze: [],
   page: 'griglia',
   // filtri griglia
@@ -459,7 +459,7 @@ async function logAct(azione,dettaglio){
 
 /* CARICAMENTO DATI */
 async function loadAll(){
-  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe,mappeTesti]=await Promise.all([
+  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe,mappeTesti,wifi]=await Promise.all([
     db('GET',T('aree'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('sedi'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('ragioni_sociali'),{ord:'nome.asc'}),
@@ -487,6 +487,7 @@ async function loadAll(){
     db('GET',T('mappe'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('asset_mappa'),{}),
     db('GET',T('mappe_testi'),{}),
+    db('GET',T('wifi'),{ord:'sede_id.asc,ssid.asc'}),
   ]);
   S.aree=aree||[];S.sedi=sedi||[];S.ragioni=ragioni||[];S.categorie=categorie||[];
   S.sottocategorie=sottocategorie||[];S.campi=campi||[];
@@ -496,7 +497,7 @@ async function loadAll(){
   S.verifiche=verifiche||[];S.convenzioni=convenzioni||[];S.alertCfg=alertCfg||[];
   S.impianti=impianti||[];S.impiantiScadenze=impiantiScadenze||[];S.assetCaratteristiche=assetCaratteristiche||[];
   S.assetProduttori=assetProduttori||[];S.assetNoleggiatori=assetNoleggiatori||[];S.assetUtenti=assetUtenti||[];
-  S.mappe=mappe||[];S.assetMappe=assetMappe||[];S.mappeTesti=mappeTesti||[];
+  S.mappe=mappe||[];S.assetMappe=assetMappe||[];S.mappeTesti=mappeTesti||[];S.wifi=wifi||[];
   // init sedi sel default (tutte)
   if(!S.griglia.sediSel.length) S.griglia.sediSel=sediOrdinate().map(s=>s.id);
   // mappa: default nessuna sede selezionata (popup tutti chiusi)
@@ -830,6 +831,7 @@ function renderGriglia(pb){
   $('gf-sedi-wrap').appendChild(msEl);
 
   $('gf-search').addEventListener('input',e=>{S.griglia.search=e.target.value;renderGrigliaTable();});
+
   // multiselect categorie
   const mcEl=buildMultiSelCat('griglia-cat',S.griglia.catIds,ids=>{
     S.griglia.catIds=[...ids]; renderGrigliaTable();
@@ -843,6 +845,7 @@ function renderGriglia(pb){
 function renderGrigliaTable(){
   const wrap=$('griglia-wrap'); if(!wrap) return;
   const isAdm=S.user?.ruolo==='admin';
+  const canWifi=['admin','it'].includes(S.user?.ruolo);
   const {search,sediSel}=S.griglia;
   const catIds=S.griglia.catIds||[];
   const sediVis=sediOrdinate(s=>sediSel.includes(s.id));
@@ -3567,6 +3570,7 @@ function renderSediPage(pb){
   </div>`;
 
   $('s-add')?.addEventListener('click',()=>openSedeModal(null));
+  pb.querySelectorAll('[data-swifi]').forEach(b=>b.addEventListener('click',()=>openWifiModal(b.dataset.swifi)));
   pb.querySelectorAll('[data-se]').forEach(b=>b.addEventListener('click',()=>openSedeModal(S.sedi.find(x=>x.id===b.dataset.se))));
   pb.querySelectorAll('[data-sd]').forEach(b=>b.addEventListener('click',()=>{
     const s=S.sedi.find(x=>x.id===b.dataset.sd);
@@ -3613,6 +3617,94 @@ async function saveOrder(tbody){
     const s=S.sedi.find(x=>x.id===sid); if(s) s.ordine=newOrd;
   }
   toast('Ordine salvato -');
+}
+
+function openWifiModal(sedeId){
+  const sede=S.sedi.find(s=>s.id===sedeId);
+  const canEdit=['admin','it'].includes(S.user?.ruolo);
+
+  const renderWifiList=()=>{
+    const reti=S.wifi.filter(w=>w.sede_id===sedeId);
+    if(!reti.length) return `<div class="emp"><div class="emi">📶</div><div class="emt">Nessuna rete configurata</div></div>`;
+    return `<table class="dt"><thead><tr><th>SSID</th><th>Password</th><th>Descrizione</th>${canEdit?'<th>Azioni</th>':''}</tr></thead><tbody>
+    ${reti.map(w=>`<tr>
+      <td><strong style="font-family:monospace;font-size:13px">${esc(w.ssid)}</strong></td>
+      <td><span style="font-family:monospace;font-size:12px;background:var(--g100);padding:2px 6px;border-radius:4px;cursor:pointer" title="Clicca per copiare"
+        onclick="navigator.clipboard.writeText('${esc(w.password||'')}').then(()=>{this.textContent='✓ copiata';setTimeout(()=>{this.textContent='${esc(w.password||'')}';},1500)})">${esc(w.password||'—')}</span></td>
+      <td style="font-size:12px;color:var(--g500)">${esc(w.descrizione||'')}</td>
+      ${canEdit?`<td><div class="tda">
+        <button class="btn bs bsm" data-wedit="${w.id}">✏</button>
+        <button class="btn bd bsm" data-wdel="${w.id}">🗑</button>
+      </div></td>`:''}
+    </tr>`).join('')}
+    </tbody></table>`;
+  };
+
+  const bodyHTML=()=>`
+    <div id="wifi-list">${renderWifiList()}</div>
+    ${canEdit?`<div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--g700);margin-bottom:10px">+ Nuova rete</div>
+      <div class="fr">
+        <div class="fg"><div class="fl">SSID *</div><input class="fi" id="wf-ssid" placeholder="Nome rete"/></div>
+        <div class="fg"><div class="fl">Password</div><input class="fi" id="wf-pwd" type="text" placeholder="Lascia vuoto se aperta"/></div>
+      </div>
+      <div class="fg"><div class="fl">Descrizione</div><input class="fi" id="wf-desc" placeholder="es. Rete ospiti, Rete staff..."/></div>
+      <button class="btn bpg bsm" id="wf-add-btn" style="margin-top:4px">+ Aggiungi</button>
+    </div>`:''}`;
+
+  openM(`📶 WiFi — ${sede?.nome||''}`,bodyHTML(),[{l:'Chiudi',c:'bs',a:closeM}]);
+
+  const bindWifi=()=>{
+    // Edit
+    document.querySelectorAll('[data-wedit]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const w=S.wifi.find(x=>x.id===b.dataset.wedit);
+        if(!w) return;
+        openM('✏ Modifica rete WiFi',`
+          <div class="fr">
+            <div class="fg"><div class="fl">SSID *</div><input class="fi" id="wfe-ssid" value="${esc(w.ssid)}"/></div>
+            <div class="fg"><div class="fl">Password</div><input class="fi" id="wfe-pwd" value="${esc(w.password||'')}"/></div>
+          </div>
+          <div class="fg"><div class="fl">Descrizione</div><input class="fi" id="wfe-desc" value="${esc(w.descrizione||'')}"/></div>`,
+        [{l:'Annulla',c:'bs',a:()=>openWifiModal(sedeId)},
+         {l:'Salva',c:'bpg',a:async()=>{
+           const ssid=$('wfe-ssid').value.trim();
+           if(!ssid){toast('SSID obbligatorio','err');return;}
+           const payload={ssid,password:$('wfe-pwd').value.trim()||null,descrizione:$('wfe-desc').value.trim()||null};
+           await db('PATCH',T('wifi'),{flt:`id=eq.${w.id}`,body:payload});
+           S.wifi=S.wifi.map(x=>x.id===w.id?{...x,...payload}:x);
+           openWifiModal(sedeId);toast('Rete aggiornata ✅');
+         }}]);
+      });
+    });
+    // Delete
+    document.querySelectorAll('[data-wdel]').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const w=S.wifi.find(x=>x.id===b.dataset.wdel);
+        openConf(`Eliminare la rete "${w?.ssid}"?`,async()=>{
+          await db('DELETE',T('wifi'),{flt:`id=eq.${b.dataset.wdel}`});
+          S.wifi=S.wifi.filter(x=>x.id!==b.dataset.wdel);
+          $('wifi-list').innerHTML=renderWifiList();
+          bindWifi();toast('Rete eliminata');
+        });
+      });
+    });
+    // Add
+    $('wf-add-btn')?.addEventListener('click',async()=>{
+      const ssid=$('wf-ssid').value.trim();
+      if(!ssid){toast('SSID obbligatorio','err');return;}
+      const [nw]=await db('POST',T('wifi'),{body:{
+        sede_id:sedeId,ssid,
+        password:$('wf-pwd').value.trim()||null,
+        descrizione:$('wf-desc').value.trim()||null
+      }});
+      S.wifi.push(nw);
+      $('wifi-list').innerHTML=renderWifiList();
+      $('wf-ssid').value='';$('wf-pwd').value='';$('wf-desc').value='';
+      bindWifi();toast('Rete aggiunta ✅');
+    });
+  };
+  setTimeout(bindWifi,50);
 }
 
 function openSedeModal(sede){
