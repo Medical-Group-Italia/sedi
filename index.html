@@ -858,6 +858,7 @@ function renderGrigliaTable(){
       ${sediVis.map(s=>`<th>
         <div style="font-weight:700;font-size:12px">${esc(s.nome)}</div>
         <div style="font-size:9px;font-weight:400;color:var(--g500);text-transform:uppercase;letter-spacing:.3px">${esc(S.aree.find(a=>a.id===s.area_id)?.nome||'')}</div>
+        <button class="btn bs bsm" data-swifi="${s.id}" title="Reti WiFi" style="margin-top:4px;font-size:11px;padding:2px 6px">&#128246;</button>
       </th>`).join('')}
     </tr></thead><tbody>`;
 
@@ -3553,8 +3554,9 @@ function renderSediPage(pb){
           <td>${s.lat&&s.lng?`<span style="font-size:11px;font-family:monospace">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</span>`:'-'}</td>
           <td><span class="bg ${s.attiva?'bg-on':'bg-off'}">${s.attiva?'Attiva':'Inattiva'}</span></td>
           <td><div class="tda">
-            <button class="btn bs bsm" data-se="${s.id}">-</button>
-            <button class="btn bd bsm" data-sd="${s.id}">-</button>
+            <button class="btn bs bsm" data-swifi="${s.id}" title="Reti WiFi">&#128246;</button>
+            <button class="btn bs bsm" data-se="${s.id}">&#9998;</button>
+            <button class="btn bd bsm" data-sd="${s.id}">&#128465;</button>
           </div></td>
         </tr>`).join('')}
       </tbody></table>
