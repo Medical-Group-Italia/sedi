@@ -926,6 +926,7 @@ function renderGrigliaTable(){
   html+=`</tbody></table>`;
   wrap.innerHTML=html;
 
+  wrap.querySelectorAll('[data-swifi]').forEach(b=>b.addEventListener('click',()=>openWifiModal(b.dataset.swifi)));
   wrap.querySelectorAll('[data-acc-cat]').forEach(row=>{
     row.addEventListener('click',()=>{acc[row.dataset.accCat]=acc[row.dataset.accCat]===false?true:false;renderGrigliaTable();});
   });
@@ -3642,7 +3643,7 @@ function openWifiModal(sedeId){
     </tbody></table>`;
   };
 
-  const bodyHTML=()=>`
+  const bodyHTML=`
     <div id="wifi-list">${renderWifiList()}</div>
     ${canEdit?`<div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px">
       <div style="font-size:12px;font-weight:700;color:var(--g700);margin-bottom:10px">+ Nuova rete</div>
@@ -3654,12 +3655,12 @@ function openWifiModal(sedeId){
       <button class="btn bpg bsm" id="wf-add-btn" style="margin-top:4px">+ Aggiungi</button>
     </div>`:''}`;
 
-  openM(`📶 WiFi — ${sede?.nome||''}`,bodyHTML(),[{l:'Chiudi',c:'bs',a:closeM}]);
+  openM(`📶 WiFi — ${sede?.nome||''}`,bodyHTML,[{l:'Chiudi',c:'bs',a:closeM}]);
 
-  const bindWifi=()=>{
-    // Edit
+  // Ri-bind solo i pulsanti riga (edit/delete) — chiamata dopo ogni refresh della lista
+  const bindRowButtons=()=>{
     document.querySelectorAll('[data-wedit]').forEach(b=>{
-      b.addEventListener('click',()=>{
+      b.onclick=()=>{
         const w=S.wifi.find(x=>x.id===b.dataset.wedit);
         if(!w) return;
         openM('✏ Modifica rete WiFi',`
@@ -3677,36 +3678,43 @@ function openWifiModal(sedeId){
            S.wifi=S.wifi.map(x=>x.id===w.id?{...x,...payload}:x);
            openWifiModal(sedeId);toast('Rete aggiornata ✅');
          }}]);
-      });
+      };
     });
-    // Delete
     document.querySelectorAll('[data-wdel]').forEach(b=>{
-      b.addEventListener('click',()=>{
+      b.onclick=()=>{
         const w=S.wifi.find(x=>x.id===b.dataset.wdel);
         openConf(`Eliminare la rete "${w?.ssid}"?`,async()=>{
           await db('DELETE',T('wifi'),{flt:`id=eq.${b.dataset.wdel}`});
           S.wifi=S.wifi.filter(x=>x.id!==b.dataset.wdel);
-          $('wifi-list').innerHTML=renderWifiList();
-          bindWifi();toast('Rete eliminata');
-        });
-      });
-    });
-    // Add
-    $('wf-add-btn')?.addEventListener('click',async()=>{
-      const ssid=$('wf-ssid').value.trim();
-      if(!ssid){toast('SSID obbligatorio','err');return;}
-      const [nw]=await db('POST',T('wifi'),{body:{
-        sede_id:sedeId,ssid,
-        password:$('wf-pwd').value.trim()||null,
-        descrizione:$('wf-desc').value.trim()||null
-      }});
-      S.wifi.push(nw);
-      $('wifi-list').innerHTML=renderWifiList();
-      $('wf-ssid').value='';$('wf-pwd').value='';$('wf-desc').value='';
-      bindWifi();toast('Rete aggiunta ✅');
+          openWifiModal(sedeId);
+          toast('Rete eliminata');
+        },true);
+      };
     });
   };
-  setTimeout(bindWifi,50);
+  bindRowButtons();
+
+  // Listener "Aggiungi" — attaccato una sola volta con onclick (non accumula)
+  const addBtn=$('wf-add-btn');
+  if(addBtn){
+    addBtn.onclick=async()=>{
+      const ssid=$('wf-ssid').value.trim();
+      if(!ssid){toast('SSID obbligatorio','err');return;}
+      addBtn.disabled=true;
+      try{
+        const [nw]=await db('POST',T('wifi'),{body:{
+          sede_id:sedeId,ssid,
+          password:$('wf-pwd').value.trim()||null,
+          descrizione:$('wf-desc').value.trim()||null
+        }});
+        S.wifi.push(nw);
+        $('wifi-list').innerHTML=renderWifiList();
+        $('wf-ssid').value='';$('wf-pwd').value='';$('wf-desc').value='';
+        bindRowButtons();toast('Rete aggiunta ✅');
+      }catch(e){toast(e.message,'err');}
+      addBtn.disabled=false;
+    };
+  }
 }
 
 function openSedeModal(sede){
@@ -4357,10 +4365,10 @@ function closeM(){
   // se siamo nella pagina asset e c'- stato un aggiornamento, ri-renderizza
   if(S._assetDirty&&S.page==='asset'){S._assetDirty=false;renderPage();}
 }
-function openConf(msg,onOk){
+function openConf(msg,onOk,skipClose){
   openM('⚠ Conferma',`<p style="color:var(--g700);font-size:13.5px;line-height:1.6">${esc(msg)}</p>`,[
     {l:'Annulla',c:'bs',a:closeM},
-    {l:'Conferma',c:'bd',a:async()=>{await onOk();closeM();}},
+    {l:'Conferma',c:'bd',a:async()=>{await onOk();if(!skipClose)closeM();}},
   ]);
 }
 $('mcls').addEventListener('click',closeM);
