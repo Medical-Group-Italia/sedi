@@ -4138,6 +4138,7 @@ function renderUtenti(pb){
         <td><span class="bg ${u.attivo?'bg-on':'bg-off'}">${u.attivo?'Attivo':'Inattivo'}</span></td>
         <td><div class="tda">
           <button class="btn bs bsm" data-ue="${u.id}">✏ Modifica</button>
+          <button class="btn bs bsm" data-uacc="${u.id}" title="Accessi ad altri tool">🔗 Accessi</button>
           ${isAdm&&u.id!==S.user?.id?`<button class="btn bd bsm" data-ud="${u.id}">🗑 Rimuovi</button>`:''}
         </div></td>
       </tr>`;}).join('')}
@@ -4148,6 +4149,7 @@ function renderUtenti(pb){
         <button class="bic" id="u-next" ${st.page>=pages-1?'disabled style="opacity:.4"':''}>▶</button>
       </div>`:''}`;
     wrap.querySelectorAll('[data-ue]').forEach(b=>b.addEventListener('click',()=>openUtenteModal(S.profili.find(x=>x.id===b.dataset.ue))));
+    wrap.querySelectorAll('[data-uacc]').forEach(b=>b.addEventListener('click',()=>openAccessiModal(S.profili.find(x=>x.id===b.dataset.uacc))));
     wrap.querySelectorAll('[data-ud]').forEach(b=>b.addEventListener('click',()=>{
       const u=S.profili.find(x=>x.id===b.dataset.ud);
       openConf(`Rimuovere il profilo di "${u?.nome} ${u?.cognome}"?\n\nL'account rimane attivo sugli altri tool.`,async()=>{
@@ -4193,6 +4195,74 @@ function renderUtenti(pb){
   $('u-ruolo').addEventListener('change',e=>{st.ruolo=e.target.value;st.page=0;renderTable();});
   $('u-stato').addEventListener('change',e=>{st.stato=e.target.value;st.page=0;renderTable();});
   $('u-add')?.addEventListener('click',()=>openUtenteModal(null));
+}
+
+/* ===========================================================
+   ACCESSI CROSS-TOOL
+=========================================================== */
+const TOOLS_MG = [
+  {prefix:'sp',        nome:'Prospect Sport'},
+  {prefix:'sedi',      nome:'Gestione Sedi'},
+  {prefix:'ferie',     nome:'Gestione Ferie'},
+  {prefix:'regint',    nome:'Registro Interventi'},
+  {prefix:'magazzino', nome:'Gestione Magazzino'},
+  {prefix:'progetti',  nome:'Gestione Progetti'},
+];
+
+async function fetchProfiloAltroTool(prefix, userId, email){
+  const table = `${prefix}_profili`;
+  try{
+    // Prova prima per id (stesso UUID Auth condiviso tra tool)
+    let url = `${CFG.URL}/rest/v1/${table}?select=ruolo,attivo,nome,cognome&id=eq.${userId}`;
+    let res = await fetch(url, {
+      headers:{'apikey':CFG.KEY,'Authorization':`Bearer ${S.token}`}
+    });
+    if(res.status===404 || res.status===400){
+      return {status:'no_table'};
+    }
+    if(!res.ok){
+      if(res.status===401||res.status===403) return {status:'denied'};
+      return {status:'error'};
+    }
+    let data = await res.json();
+    if(data && data.length) return {status:'found', ...data[0]};
+    return {status:'not_found'};
+  }catch(e){
+    return {status:'error'};
+  }
+}
+
+async function openAccessiModal(u){
+  if(!u) return;
+  openM(`🔗 Accessi — ${u.nome} ${u.cognome}`,
+    `<div style="font-size:13px;color:var(--g500);margin-bottom:12px">${esc(u.email)}</div>
+     <div id="accessi-list" style="display:flex;flex-direction:column;gap:8px">
+       ${TOOLS_MG.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--g50);border-radius:var(--rsm)">
+         <span style="font-weight:600;font-size:13px">${esc(t.nome)}</span>
+         <span id="acc-${t.prefix}" style="font-size:12px;color:var(--g400)">Verifica in corso…</span>
+       </div>`).join('')}
+     </div>`,
+    [{l:'Chiudi',c:'bs',a:closeM}]
+  );
+
+  for(const t of TOOLS_MG){
+    const el = document.getElementById(`acc-${t.prefix}`);
+    if(!el) continue;
+    const result = await fetchProfiloAltroTool(t.prefix, u.id, u.email);
+    if(!el.isConnected) continue; // modale chiusa nel frattempo
+    if(result.status==='found'){
+      const attivoLabel = result.attivo===false ? ' <span style="color:var(--red)">(disattivato)</span>' : '';
+      el.innerHTML = `<span class="bg bg-on" style="font-size:11px">${esc(result.ruolo||'—')}</span>${attivoLabel}`;
+    }else if(result.status==='not_found'){
+      el.innerHTML = `<span style="color:var(--g400)">Nessun accesso</span>`;
+    }else if(result.status==='denied'){
+      el.innerHTML = `<span style="color:var(--g400)" title="Permessi insufficienti per verificare">Non verificabile</span>`;
+    }else if(result.status==='no_table'){
+      el.innerHTML = `<span style="color:var(--g400)">—</span>`;
+    }else{
+      el.innerHTML = `<span style="color:var(--g400)">Errore verifica</span>`;
+    }
+  }
 }
 
 function openUtenteModal(u){
