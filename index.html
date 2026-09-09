@@ -321,7 +321,7 @@ const S = {
   aree: [], sedi: [], categorie: [], sottocategorie: [], campi: [], valori: [], profili: [], log: [],
   ragioni: [], fornitori: [], assetCat: [], assetSubcat: [], asset: [], assetSedi: [], costi: [], documenti: [],
   assetCaratteristiche: [], assetProduttori: [], assetNoleggiatori: [], assetUtenti: [],
-  mappe: [], assetMappe: [], wifi: [], _mappaPanel:{open:false,sedeId:'',mappaId:'',highlightId:'',_placeMode:false,_textMode:false},
+  mappe: [], assetMappe: [], wifi: [], immobili: [], immobiliCanoni: [], immobiliCondominio: [], immobiliRinnovi: [], _mappaPanel:{open:false,sedeId:'',mappaId:'',highlightId:'',_placeMode:false,_textMode:false},
   verifiche: [], convenzioni: [], alertCfg: [], impianti: [], impiantiScadenze: [],
   page: 'griglia',
   // filtri griglia
@@ -344,6 +344,7 @@ const NAV_ADMIN = [
   {id:'sedi',        l:'Sedi',                ic:'', r:['admin']},
   {id:'sedi_mappe',  l:'Sedi: mappe',         ic:'', r:['admin','it']},
   {id:'ragioni',     l:'Ragioni sociali',     ic:'', r:['admin']},
+  {id:'immobili',    l:'Immobili',            ic:'', r:['admin']},
   {id:'aree',        l:'Aree geografiche',    ic:'', r:['admin']},
   {id:'fornitori',   l:'Fornitori',           ic:'', r:['admin']},
   {id:'struttura',   l:'Struttura',           ic:'', r:['admin','it']},
@@ -460,7 +461,7 @@ async function logAct(azione,dettaglio){
 
 /* CARICAMENTO DATI */
 async function loadAll(){
-  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe,mappeTesti,wifi]=await Promise.all([
+  const [aree,sedi,ragioni,categorie,sottocategorie,campi,valori,profili,log,assetCat,assetSubcat,asset,assetSedi,fornitori,costi,verifiche,convenzioni,alertCfg,impianti,impiantiScadenze,assetCaratteristiche,assetProduttori,assetNoleggiatori,assetUtenti,mappe,assetMappe,mappeTesti,wifi,immobili,immobiliCanoni,immobiliCondominio,immobiliRinnovi]=await Promise.all([
     db('GET',T('aree'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('sedi'),{ord:'ordine.asc,nome.asc'}),
     db('GET',T('ragioni_sociali'),{ord:'nome.asc'}),
@@ -489,6 +490,10 @@ async function loadAll(){
     db('GET',T('asset_mappa'),{}),
     db('GET',T('mappe_testi'),{}),
     db('GET',T('wifi'),{ord:'sede_id.asc,ssid.asc'}),
+    db('GET',T('immobili'),{}),
+    db('GET',T('immobili_canoni'),{ord:'data_da.desc'}),
+    db('GET',T('immobili_condominio'),{ord:'data_scadenza.asc'}),
+    db('GET',T('immobili_rinnovi'),{ord:'data_scadenza.asc'}),
   ]);
   S.aree=aree||[];S.sedi=sedi||[];S.ragioni=ragioni||[];S.categorie=categorie||[];
   S.sottocategorie=sottocategorie||[];S.campi=campi||[];
@@ -499,6 +504,7 @@ async function loadAll(){
   S.impianti=impianti||[];S.impiantiScadenze=impiantiScadenze||[];S.assetCaratteristiche=assetCaratteristiche||[];
   S.assetProduttori=assetProduttori||[];S.assetNoleggiatori=assetNoleggiatori||[];S.assetUtenti=assetUtenti||[];
   S.mappe=mappe||[];S.assetMappe=assetMappe||[];S.mappeTesti=mappeTesti||[];S.wifi=wifi||[];
+  S.immobili=immobili||[];S.immobiliCanoni=immobiliCanoni||[];S.immobiliCondominio=immobiliCondominio||[];S.immobiliRinnovi=immobiliRinnovi||[];
   // init sedi sel default (tutte)
   if(!S.griglia.sediSel.length) S.griglia.sediSel=sediOrdinate().map(s=>s.id);
   // mappa: default nessuna sede selezionata (popup tutti chiusi)
@@ -664,6 +670,7 @@ function renderPage(){
   else if(S.page==='sedi')      renderSediPage(pb);
   else if(S.page==='sedi_mappe') renderSediMappe(pb);
   else if(S.page==='ragioni')   renderRagioni(pb);
+  else if(S.page==='immobili')  renderImmobili(pb);
   else if(S.page==='fornitori')   renderFornitori(pb);
   else if(S.page==='produttori')   renderProduttori(pb);
   else if(S.page==='noleggiatori') renderNoleggiatori(pb);
@@ -3022,6 +3029,434 @@ function openAssetSubcatModal(sc,catId){
 }
 
 /* PAGINA RAGIONI SOCIALI */
+/* ===========================================================
+   IMMOBILI
+=========================================================== */
+function canoneAttuale(immobileId){
+  const oggi=new Date().toISOString().slice(0,10);
+  const attivi=S.immobiliCanoni.filter(c=>c.immobile_id===immobileId&&c.data_da<=oggi&&(!c.data_a||c.data_a>=oggi));
+  return attivi.sort((a,b)=>b.data_da.localeCompare(a.data_da))[0]||null;
+}
+function prossimaScadenzaCondominio(immobileId){
+  return S.immobiliCondominio.filter(c=>c.immobile_id===immobileId&&!c.pagato&&c.data_scadenza)
+    .sort((a,b)=>a.data_scadenza.localeCompare(b.data_scadenza))[0]||null;
+}
+function prossimoRinnovo(immobileId){
+  return S.immobiliRinnovi.filter(r=>r.immobile_id===immobileId&&r.data_scadenza)
+    .sort((a,b)=>a.data_scadenza.localeCompare(b.data_scadenza))[0]||null;
+}
+const PROP_LABEL={owned:'Di proprietà',rent:'Affitto',sublet:'Sublocazione'};
+const PROP_BADGE={owned:'bg-on',rent:'bg-usr',sublet:'bg-it'};
+
+function renderImmobili(pb){
+  if(!S._immF) S._immF={search:'',sedeId:'',propFilter:''};
+  const f=S._immF;
+  const lista=S.immobili.filter(im=>{
+    if(f.sedeId&&im.sede_id!==f.sedeId) return false;
+    if(f.propFilter&&im.proprieta!==f.propFilter) return false;
+    if(f.search){
+      const q=f.search.toLowerCase();
+      const sede=S.sedi.find(s=>s.id===im.sede_id);
+      const rag=S.ragioni.find(r=>r.id===im.ragione_sociale_id);
+      if(!`${sede?.nome||''} ${rag?.nome||''} ${im.prop_nome||''} ${im.note||''}`.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(S.sedi.find(s=>s.id===a.sede_id)?.nome||'').localeCompare(S.sedi.find(s=>s.id===b.sede_id)?.nome||''));
+
+  pb.innerHTML=`<div class="fian"><div class="card">
+    <div class="ch">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="ct">Immobili (${lista.length}/${S.immobili.length})</span>
+        <input class="fi-sm" id="imm-search" placeholder="🔍 Cerca..." value="${esc(f.search)}" style="width:200px"/>
+        <select class="fi-sm" id="imm-sede">
+          <option value="">Tutte le sedi</option>
+          ${sediOrdinate().map(s=>`<option value="${s.id}"${f.sedeId===s.id?' selected':''}>${esc(s.nome)}</option>`).join('')}
+        </select>
+        <select class="fi-sm" id="imm-prop">
+          <option value="">Tutte le tipologie</option>
+          <option value="owned"${f.propFilter==='owned'?' selected':''}>Di proprietà</option>
+          <option value="rent"${f.propFilter==='rent'?' selected':''}>Affitto</option>
+          <option value="sublet"${f.propFilter==='sublet'?' selected':''}>Sublocazione</option>
+        </select>
+      </div>
+      <button class="btn bpg bsm" id="imm-add">+ Nuovo immobile</button>
+    </div>
+    ${!lista.length?`<div class="emp"><div class="emi">🏢</div><div class="emt">${S.immobili.length?'Nessun risultato':'Nessun immobile registrato'}</div></div>`:
+    `<table class="dt"><thead><tr>
+      <th>Sede</th><th>Ragione sociale</th><th>Proprietà</th><th>Canone attuale</th><th>Condominio</th><th>Rinnovi</th><th>Azioni</th>
+    </tr></thead><tbody>
+    ${lista.map(im=>{
+      const sede=S.sedi.find(s=>s.id===im.sede_id);
+      const rag=S.ragioni.find(r=>r.id===im.ragione_sociale_id);
+      const canone=canoneAttuale(im.id);
+      const condo=prossimaScadenzaCondominio(im.id);
+      const rinnovo=prossimoRinnovo(im.id);
+      const isRent=im.proprieta!=='owned';
+      const giorniCondo=condo?giorniAllaScadenza(new Date(condo.data_scadenza+'T00:00:00')):null;
+      const giorniRinnovo=rinnovo?giorniAllaScadenza(new Date(rinnovo.data_scadenza+'T00:00:00')):null;
+      return `<tr>
+        <td class="tn">${esc(sede?.nome||'—')}</td>
+        <td style="font-size:12px">${esc(rag?.nome||'—')}</td>
+        <td><span class="bg ${PROP_BADGE[im.proprieta]||'bg-usr'}" style="font-size:11px">${PROP_LABEL[im.proprieta]||im.proprieta}</span></td>
+        <td style="font-size:12px">${canone?`€ ${Number(canone.importo_annuale).toLocaleString('it-IT')}/anno`:'—'}</td>
+        <td>${!isRent?'<span style="color:var(--g300)">—</span>':condo?`<span style="font-size:11px" title="${esc(condo.descrizione)}">${scadenzaBadge(giorniCondo)}</span>`:'<span style="color:var(--g400);font-size:11px">Nessuna</span>'}</td>
+        <td>${!isRent?'<span style="color:var(--g300)">—</span>':rinnovo?`<span style="font-size:11px" title="${esc(rinnovo.descrizione)}">${scadenzaBadge(giorniRinnovo)}</span>`:'<span style="color:var(--g400);font-size:11px">Nessuno</span>'}</td>
+        <td><div class="tda">
+          <button class="btn bs bsm" data-imm-canoni="${im.id}" title="Canoni" ${!isRent?'disabled style="opacity:.35;cursor:not-allowed"':''}>💶</button>
+          <button class="btn bs bsm" data-imm-condo="${im.id}" title="Spese condominiali" ${!isRent?'disabled style="opacity:.35;cursor:not-allowed"':''}>🏘</button>
+          <button class="btn bs bsm" data-imm-rinnovi="${im.id}" title="Rinnovi contratto" ${!isRent?'disabled style="opacity:.35;cursor:not-allowed"':''}>📅</button>
+          <button class="btn bs bsm" data-imm-edit="${im.id}">✏</button>
+          <button class="btn bd bsm" data-imm-del="${im.id}">🗑</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`}
+  </div></div>`;
+
+  $('imm-search').addEventListener('input',e=>{f.search=e.target.value;renderImmobili(pb);});
+  $('imm-sede').addEventListener('change',e=>{f.sedeId=e.target.value;renderImmobili(pb);});
+  $('imm-prop').addEventListener('change',e=>{f.propFilter=e.target.value;renderImmobili(pb);});
+  $('imm-add').addEventListener('click',()=>openImmobileModal(null));
+  pb.querySelectorAll('[data-imm-edit]').forEach(b=>b.addEventListener('click',()=>openImmobileModal(S.immobili.find(x=>x.id===b.dataset.immEdit))));
+  pb.querySelectorAll('[data-imm-del]').forEach(b=>b.addEventListener('click',()=>{
+    const im=S.immobili.find(x=>x.id===b.dataset.immDel);
+    const sede=S.sedi.find(s=>s.id===im?.sede_id);
+    openConf(`Eliminare l'immobile associato a "${sede?.nome}"? Verranno eliminati anche canoni, scadenze condominiali e rinnovi collegati.`,async()=>{
+      await db('DELETE',T('immobili'),{flt:`id=eq.${b.dataset.immDel}`});
+      S.immobili=S.immobili.filter(x=>x.id!==b.dataset.immDel);
+      S.immobiliCanoni=S.immobiliCanoni.filter(x=>x.immobile_id!==b.dataset.immDel);
+      S.immobiliCondominio=S.immobiliCondominio.filter(x=>x.immobile_id!==b.dataset.immDel);
+      S.immobiliRinnovi=S.immobiliRinnovi.filter(x=>x.immobile_id!==b.dataset.immDel);
+      renderPage();toast('Immobile eliminato');
+    });
+  }));
+  pb.querySelectorAll('[data-imm-canoni]:not([disabled])').forEach(b=>b.addEventListener('click',()=>openCanoniModal(b.dataset.immCanoni)));
+  pb.querySelectorAll('[data-imm-condo]:not([disabled])').forEach(b=>b.addEventListener('click',()=>openCondominioModal(b.dataset.immCondo)));
+  pb.querySelectorAll('[data-imm-rinnovi]:not([disabled])').forEach(b=>b.addEventListener('click',()=>openRinnoviModal(b.dataset.immRinnovi)));
+}
+
+function openImmobileModal(im){
+  const propVal=im?.proprieta||'owned';
+  const body=`
+    <div class="fr">
+      <div class="fg"><div class="fl">Sede *</div>
+        <select class="fse" id="im-sede">
+          <option value="">— Seleziona —</option>
+          ${sediOrdinate().map(s=>`<option value="${s.id}"${im?.sede_id===s.id?' selected':''}>${esc(s.nome)}</option>`).join('')}
+        </select></div>
+      <div class="fg"><div class="fl">Ragione sociale</div>
+        <select class="fse" id="im-rag">
+          <option value="">— Nessuna —</option>
+          ${S.ragioni.map(r=>`<option value="${r.id}"${im?.ragione_sociale_id===r.id?' selected':''}>${esc(r.nome)}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="fg"><div class="fl">Tipo di proprietà</div>
+      <select class="fse" id="im-prop" onchange="document.getElementById('im-rent-wrap').style.display=this.value==='owned'?'none':''">
+        <option value="owned"${propVal==='owned'?' selected':''}>Di proprietà</option>
+        <option value="rent"${propVal==='rent'?' selected':''}>Affitto</option>
+        <option value="sublet"${propVal==='sublet'?' selected':''}>Sublocazione</option>
+      </select>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px">Società proprietaria dell'immobile</div>
+    <div class="fg"><div class="fl">Denominazione</div><input class="fi" id="im-pnome" value="${esc(im?.prop_nome||'')}"/></div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Partita IVA</div><input class="fi" id="im-ppiva" value="${esc(im?.prop_piva||'')}"/></div>
+      <div class="fg"><div class="fl">Codice fiscale</div><input class="fi" id="im-pcf" value="${esc(im?.prop_cf||'')}"/></div>
+    </div>
+    <div class="fg"><div class="fl">Indirizzo</div><input class="fi" id="im-pind" value="${esc(im?.prop_indirizzo||'')}"/></div>
+    <div class="fr">
+      <div class="fg"><div class="fl">Telefono</div><input class="fi" id="im-ptel" value="${esc(im?.prop_telefono||'')}"/></div>
+      <div class="fg"><div class="fl">Email</div><input class="fi" id="im-pemail" value="${esc(im?.prop_email||'')}"/></div>
+    </div>
+    <div class="fg"><div class="fl">PEC</div><input class="fi" id="im-ppec" value="${esc(im?.prop_pec||'')}"/></div>
+    <div id="im-rent-wrap" style="display:${propVal==='owned'?'none':''}">
+      <div class="alert ai" style="font-size:12px;margin-top:10px">💡 Dopo aver salvato potrai gestire canoni, spese condominiali e scadenze di rinnovo dai pulsanti nella tabella.</div>
+    </div>
+    <div class="fg" style="margin-top:10px"><div class="fl">Note</div><textarea class="fta" id="im-note">${esc(im?.note||'')}</textarea></div>`;
+  openM(im?'✏ Modifica immobile':'+ Nuovo immobile',body,[
+    {l:'Annulla',c:'bs',a:closeM},
+    {l:'Salva',c:'bpg',a:async()=>{
+      const sede=$('im-sede').value;
+      if(!sede){toast('Seleziona una sede','err');return;}
+      const payload={
+        sede_id:sede,
+        ragione_sociale_id:$('im-rag').value||null,
+        proprieta:$('im-prop').value,
+        prop_nome:$('im-pnome').value.trim()||null,
+        prop_piva:$('im-ppiva').value.trim()||null,
+        prop_cf:$('im-pcf').value.trim()||null,
+        prop_indirizzo:$('im-pind').value.trim()||null,
+        prop_telefono:$('im-ptel').value.trim()||null,
+        prop_email:$('im-pemail').value.trim()||null,
+        prop_pec:$('im-ppec').value.trim()||null,
+        note:$('im-note').value.trim()||null,
+      };
+      try{
+        if(im){
+          await db('PATCH',T('immobili'),{flt:`id=eq.${im.id}`,body:payload});
+          S.immobili=S.immobili.map(x=>x.id===im.id?{...x,...payload}:x);
+        }else{
+          const [ni]=await db('POST',T('immobili'),{body:payload});
+          S.immobili.push(ni);
+        }
+        closeM();renderPage();toast(im?'Immobile aggiornato':'Immobile aggiunto ✅');
+      }catch(e){toast(e.message,'err');}
+    }},
+  ]);
+}
+
+/* ---- Canoni (storico) ---- */
+function openCanoniModal(immobileId){
+  const im=S.immobili.find(x=>x.id===immobileId);
+  const sede=S.sedi.find(s=>s.id===im?.sede_id);
+  const storico=S.immobiliCanoni.filter(c=>c.immobile_id===immobileId).sort((a,b)=>b.data_da.localeCompare(a.data_da));
+
+  const renderList=()=>!storico.length
+    ?`<div class="emp"><div class="ems">Nessun canone registrato</div></div>`
+    :`<table class="dt"><thead><tr><th>Importo annuale</th><th>Dal</th><th>Al</th><th>Note</th><th></th></tr></thead><tbody>
+      ${storico.map(c=>`<tr${!c.data_a?' style="font-weight:600"':''}>
+        <td>€ ${Number(c.importo_annuale).toLocaleString('it-IT')}</td>
+        <td>${fmtDate(c.data_da)}</td>
+        <td>${c.data_a?fmtDate(c.data_a):'<span class="bg bg-on" style="font-size:11px">Attuale</span>'}</td>
+        <td style="font-size:12px;color:var(--g500)">${esc(c.note||'')}</td>
+        <td><button class="btn bd bsm" data-can-del="${c.id}">🗑</button></td>
+      </tr>`).join('')}
+      </tbody></table>`;
+
+  const body=`
+    <div style="font-size:13px;color:var(--g500);margin-bottom:12px">Immobile: <strong>${esc(sede?.nome||'')}</strong></div>
+    <div id="canoni-list">${renderList()}</div>
+    <div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--g700);margin-bottom:10px">+ Nuovo canone</div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Importo annuale (€) *</div><input class="fi" id="can-importo" type="number" step="0.01"/></div>
+        <div class="fg"><div class="fl">Valido dal *</div><input class="fi" id="can-dal" type="date" value="${new Date().toISOString().slice(0,10)}"/></div>
+      </div>
+      <div class="fg"><div class="fl">Note</div><input class="fi" id="can-note"/></div>
+      <div style="font-size:11px;color:var(--g500);margin-bottom:8px">💡 Inserendo un nuovo canone, quello attualmente attivo verrà automaticamente terminato alla data "Valido dal".</div>
+      <button class="btn bpg bsm" id="can-add-btn">+ Aggiungi</button>
+    </div>`;
+
+  openM(`💶 Canoni — ${sede?.nome||''}`,body,[{l:'Chiudi',c:'bs',a:closeM}]);
+
+  const bindCanoni=()=>{
+    document.querySelectorAll('[data-can-del]').forEach(b=>b.onclick=()=>{
+      openConf('Eliminare questo canone dallo storico?',async()=>{
+        await db('DELETE',T('immobili_canoni'),{flt:`id=eq.${b.dataset.canDel}`});
+        S.immobiliCanoni=S.immobiliCanoni.filter(x=>x.id!==b.dataset.canDel);
+        openCanoniModal(immobileId);
+      },true);
+    });
+  };
+  bindCanoni();
+  $('can-add-btn').onclick=async()=>{
+    const importo=parseFloat($('can-importo').value);
+    const dal=$('can-dal').value;
+    if(!importo||!dal){toast('Importo e data obbligatori','err');return;}
+    try{
+      const attuale=S.immobiliCanoni.find(c=>c.immobile_id===immobileId&&!c.data_a);
+      if(attuale){
+        const prevDay=new Date(dal+'T00:00:00');prevDay.setDate(prevDay.getDate()-1);
+        const dataA=prevDay.toISOString().slice(0,10);
+        await db('PATCH',T('immobili_canoni'),{flt:`id=eq.${attuale.id}`,body:{data_a:dataA}});
+        S.immobiliCanoni=S.immobiliCanoni.map(x=>x.id===attuale.id?{...x,data_a:dataA}:x);
+      }
+      const [nc]=await db('POST',T('immobili_canoni'),{body:{immobile_id:immobileId,importo_annuale:importo,data_da:dal,note:$('can-note').value.trim()||null}});
+      S.immobiliCanoni.push(nc);
+      renderPage();
+      openCanoniModal(immobileId);
+      toast('Canone aggiunto ✅');
+    }catch(e){toast(e.message,'err');}
+  };
+}
+
+/* ---- Spese condominiali ---- */
+function openCondominioModal(immobileId){
+  const im=S.immobili.find(x=>x.id===immobileId);
+  const sede=S.sedi.find(s=>s.id===im?.sede_id);
+  const lista=S.immobiliCondominio.filter(c=>c.immobile_id===immobileId).sort((a,b)=>(b.data_scadenza||'').localeCompare(a.data_scadenza||''));
+
+  const renderList=()=>!lista.length
+    ?`<div class="emp"><div class="ems">Nessuna spesa condominiale registrata</div></div>`
+    :lista.map((c,i)=>{
+      const giorni=c.data_scadenza?giorniAllaScadenza(new Date(c.data_scadenza+'T00:00:00')):null;
+      return `<div style="background:var(--g50);border-radius:var(--rsm);padding:12px;margin-bottom:8px">
+        <div class="fr" style="margin-bottom:8px">
+          <div class="fg" style="margin:0"><div class="fl">Descrizione *</div><input class="fi" id="cd-desc-${c.id}" value="${esc(c.descrizione||'')}"/></div>
+          <div class="fg" style="margin:0"><div class="fl">Scadenza</div><input class="fi" id="cd-data-${c.id}" type="date" value="${c.data_scadenza||''}"/></div>
+        </div>
+        <div class="fr" style="margin-bottom:8px">
+          <div class="fg" style="margin:0"><div class="fl">Importo previsto (€)</div><input class="fi" id="cd-imp-${c.id}" type="number" step="0.01" value="${c.importo_previsto||''}"/></div>
+          <div class="fg" style="margin:0;display:flex;align-items:flex-end;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+              <input type="checkbox" id="cd-pagato-${c.id}" ${c.pagato?'checked':''} onchange="document.getElementById('cd-pagwrap-${c.id}').style.display=this.checked?'':'none'"/> Pagato
+            </label>
+            ${!c.data_scadenza?'':`<span style="margin-left:auto">${scadenzaBadge(giorni)}</span>`}
+          </div>
+        </div>
+        <div id="cd-pagwrap-${c.id}" style="display:${c.pagato?'':'none'};margin-bottom:8px" class="fr">
+          <div class="fg" style="margin:0"><div class="fl">Importo pagato (€)</div><input class="fi" id="cd-imppag-${c.id}" type="number" step="0.01" value="${c.importo_pagato||''}"/></div>
+          <div class="fg" style="margin:0"><div class="fl">Data pagamento</div><input class="fi" id="cd-datapag-${c.id}" type="date" value="${c.data_pagamento||''}"/></div>
+        </div>
+        <div class="fg" style="margin-bottom:8px"><div class="fl">Email alert (separate da virgola)</div><input class="fi" id="cd-email-${c.id}" value="${esc(c.emails||'')}"/></div>
+        <div class="fr" style="margin-bottom:0">
+          <div class="fg" style="margin:0"><div class="fl">Giorni prima per alert</div><input class="fi" id="cd-giorni-${c.id}" value="${esc(c.giorni_prima||'1,7,30,60')}"/></div>
+          <div class="fg" style="margin:0;display:flex;align-items:flex-end;gap:6px">
+            <button class="btn bs bsm" data-cd-save="${c.id}">💾 Salva riga</button>
+            <button class="btn bs bsm" data-cd-test="${c.id}">🧪 TEST</button>
+            <button class="btn bd bsm" data-cd-del="${c.id}">🗑</button>
+          </div>
+        </div>
+        <div id="cd-test-${c.id}" style="font-size:12px;color:var(--g500);margin-top:4px"></div>
+      </div>`;
+    }).join('');
+
+  const body=`
+    <div style="font-size:13px;color:var(--g500);margin-bottom:12px">Immobile: <strong>${esc(sede?.nome||'')}</strong></div>
+    <div id="condo-list">${renderList()}</div>
+    <button class="btn bpg bsm" id="condo-add-btn" style="margin-top:8px">+ Nuova scadenza condominiale</button>`;
+
+  openM(`🏘 Spese condominiali — ${sede?.nome||''}`,body,[{l:'Chiudi',c:'bs',a:closeM}]);
+
+  const bindCondo=()=>{
+    document.querySelectorAll('[data-cd-save]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.cdSave;
+      const pagato=$(`cd-pagato-${id}`).checked;
+      const payload={
+        descrizione:$(`cd-desc-${id}`).value.trim(),
+        data_scadenza:$(`cd-data-${id}`).value||null,
+        importo_previsto:parseFloat($(`cd-imp-${id}`).value)||null,
+        pagato,
+        importo_pagato:pagato?(parseFloat($(`cd-imppag-${id}`).value)||null):null,
+        data_pagamento:pagato?($(`cd-datapag-${id}`).value||null):null,
+        emails:$(`cd-email-${id}`).value.trim()||null,
+        giorni_prima:$(`cd-giorni-${id}`).value.trim()||'1,7,30,60',
+      };
+      if(!payload.descrizione){toast('Descrizione obbligatoria','err');return;}
+      try{
+        await db('PATCH',T('immobili_condominio'),{flt:`id=eq.${id}`,body:payload});
+        S.immobiliCondominio=S.immobiliCondominio.map(x=>x.id===id?{...x,...payload}:x);
+        renderPage();toast('Riga aggiornata ✅');
+      }catch(e){toast(e.message,'err');}
+    });
+    document.querySelectorAll('[data-cd-del]').forEach(b=>b.onclick=()=>{
+      openConf('Eliminare questa scadenza?',async()=>{
+        await db('DELETE',T('immobili_condominio'),{flt:`id=eq.${b.dataset.cdDel}`});
+        S.immobiliCondominio=S.immobiliCondominio.filter(x=>x.id!==b.dataset.cdDel);
+        renderPage();
+        openCondominioModal(immobileId);
+      },true);
+    });
+    document.querySelectorAll('[data-cd-test]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.cdTest;
+      const resEl=document.getElementById(`cd-test-${id}`);
+      if(resEl) resEl.textContent='Invio in corso…';
+      try{
+        const resp=await fetch(`${CFG.FN}/sedi-alert-immobili`,{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.token}`},
+          body:JSON.stringify({test:true,tipo:'condominio',id})});
+        const data=await resp.json();
+        if(resEl) resEl.textContent=data.ok?'✅ Email inviata!':'⚠ '+JSON.stringify(data);
+      }catch(e){if(resEl) resEl.textContent='❌ '+e.message;}
+    });
+  };
+  bindCondo();
+
+  $('condo-add-btn').onclick=async()=>{
+    try{
+      const [nc]=await db('POST',T('immobili_condominio'),{body:{immobile_id:immobileId,descrizione:'Nuova scadenza',giorni_prima:'1,7,30,60'}});
+      S.immobiliCondominio.push(nc);
+      openCondominioModal(immobileId);
+    }catch(e){toast(e.message,'err');}
+  };
+}
+
+/* ---- Rinnovi contratto ---- */
+function openRinnoviModal(immobileId){
+  const im=S.immobili.find(x=>x.id===immobileId);
+  const sede=S.sedi.find(s=>s.id===im?.sede_id);
+  const lista=S.immobiliRinnovi.filter(r=>r.immobile_id===immobileId).sort((a,b)=>(b.data_scadenza||'').localeCompare(a.data_scadenza||''));
+
+  const renderList=()=>!lista.length
+    ?`<div class="emp"><div class="ems">Nessuna scadenza di rinnovo registrata</div></div>`
+    :lista.map((r,i)=>{
+      const giorni=r.data_scadenza?giorniAllaScadenza(new Date(r.data_scadenza+'T00:00:00')):null;
+      return `<div style="background:var(--g50);border-radius:var(--rsm);padding:12px;margin-bottom:8px">
+        <div class="fr" style="margin-bottom:8px">
+          <div class="fg" style="margin:0"><div class="fl">Descrizione *</div><input class="fi" id="rn-desc-${r.id}" value="${esc(r.descrizione||'')}"/></div>
+          <div class="fg" style="margin:0"><div class="fl">Scadenza</div><input class="fi" id="rn-data-${r.id}" type="date" value="${r.data_scadenza||''}"/></div>
+        </div>
+        <div class="fg" style="margin-bottom:8px"><div class="fl">Email alert (separate da virgola)</div><input class="fi" id="rn-email-${r.id}" value="${esc(r.emails||'')}"/></div>
+        <div class="fg" style="margin-bottom:8px"><div class="fl">Note</div><input class="fi" id="rn-note-${r.id}" value="${esc(r.note||'')}"/></div>
+        <div class="fr" style="margin-bottom:0;align-items:flex-end">
+          <div class="fg" style="margin:0"><div class="fl">Giorni prima per alert</div><input class="fi" id="rn-giorni-${r.id}" value="${esc(r.giorni_prima||'1,7,30,60')}"/></div>
+          <div class="fg" style="margin:0;display:flex;align-items:flex-end;gap:6px">
+            ${!r.data_scadenza?'':`<span style="margin-right:auto">${scadenzaBadge(giorni)}</span>`}
+            <button class="btn bs bsm" data-rn-save="${r.id}">💾 Salva riga</button>
+            <button class="btn bs bsm" data-rn-test="${r.id}">🧪 TEST</button>
+            <button class="btn bd bsm" data-rn-del="${r.id}">🗑</button>
+          </div>
+        </div>
+        <div id="rn-test-${r.id}" style="font-size:12px;color:var(--g500);margin-top:4px"></div>
+      </div>`;
+    }).join('');
+
+  const body=`
+    <div style="font-size:13px;color:var(--g500);margin-bottom:12px">Immobile: <strong>${esc(sede?.nome||'')}</strong></div>
+    <div id="rinnovi-list">${renderList()}</div>
+    <button class="btn bpg bsm" id="rinnovi-add-btn" style="margin-top:8px">+ Nuova scadenza rinnovo</button>`;
+
+  openM(`📅 Rinnovi contratto — ${sede?.nome||''}`,body,[{l:'Chiudi',c:'bs',a:closeM}]);
+
+  const bindRinnovi=()=>{
+    document.querySelectorAll('[data-rn-save]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.rnSave;
+      const payload={
+        descrizione:$(`rn-desc-${id}`).value.trim(),
+        data_scadenza:$(`rn-data-${id}`).value||null,
+        emails:$(`rn-email-${id}`).value.trim()||null,
+        note:$(`rn-note-${id}`).value.trim()||null,
+        giorni_prima:$(`rn-giorni-${id}`).value.trim()||'1,7,30,60',
+      };
+      if(!payload.descrizione){toast('Descrizione obbligatoria','err');return;}
+      try{
+        await db('PATCH',T('immobili_rinnovi'),{flt:`id=eq.${id}`,body:payload});
+        S.immobiliRinnovi=S.immobiliRinnovi.map(x=>x.id===id?{...x,...payload}:x);
+        renderPage();toast('Riga aggiornata ✅');
+      }catch(e){toast(e.message,'err');}
+    });
+    document.querySelectorAll('[data-rn-del]').forEach(b=>b.onclick=()=>{
+      openConf('Eliminare questa scadenza?',async()=>{
+        await db('DELETE',T('immobili_rinnovi'),{flt:`id=eq.${b.dataset.rnDel}`});
+        S.immobiliRinnovi=S.immobiliRinnovi.filter(x=>x.id!==b.dataset.rnDel);
+        renderPage();
+        openRinnoviModal(immobileId);
+      },true);
+    });
+    document.querySelectorAll('[data-rn-test]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.rnTest;
+      const resEl=document.getElementById(`rn-test-${id}`);
+      if(resEl) resEl.textContent='Invio in corso…';
+      try{
+        const resp=await fetch(`${CFG.FN}/sedi-alert-immobili`,{method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.token}`},
+          body:JSON.stringify({test:true,tipo:'rinnovo',id})});
+        const data=await resp.json();
+        if(resEl) resEl.textContent=data.ok?'✅ Email inviata!':'⚠ '+JSON.stringify(data);
+      }catch(e){if(resEl) resEl.textContent='❌ '+e.message;}
+    });
+  };
+  bindRinnovi();
+
+  $('rinnovi-add-btn').onclick=async()=>{
+    try{
+      const [nr]=await db('POST',T('immobili_rinnovi'),{body:{immobile_id:immobileId,descrizione:'Nuova scadenza',giorni_prima:'1,7,30,60'}});
+      S.immobiliRinnovi.push(nr);
+      openRinnoviModal(immobileId);
+    }catch(e){toast(e.message,'err');}
+  };
+}
+
 function renderRagioni(pb){
   const ragioni=S.ragioni||[];
   pb.innerHTML=`<div class="fian"><div class="card">
