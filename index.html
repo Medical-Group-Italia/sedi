@@ -3095,7 +3095,7 @@ function renderImmobili(pb){
       const giorniCondo=condo?giorniAllaScadenza(new Date(condo.data_scadenza+'T00:00:00')):null;
       const giorniRinnovo=rinnovo?giorniAllaScadenza(new Date(rinnovo.data_scadenza+'T00:00:00')):null;
       return `<tr>
-        <td class="tn">${esc(sede?.nome||'—')}</td>
+        <td><div class="tn">${esc(sede?.nome||'—')}</div>${[im.indirizzo,im.cap,im.citta,im.provincia?`(${im.provincia})`:null].filter(Boolean).length?`<div class="ts">${esc([im.indirizzo,im.cap,im.citta,im.provincia?`(${im.provincia})`:null].filter(Boolean).join(' '))}</div>`:''}</td>
         <td style="font-size:12px">${esc(rag?.nome||'—')}</td>
         <td><span class="bg ${PROP_BADGE[im.proprieta]||'bg-usr'}" style="font-size:11px">${PROP_LABEL[im.proprieta]||im.proprieta}</span></td>
         <td style="font-size:12px">${canone?`€ ${Number(canone.importo_annuale).toLocaleString('it-IT')}/anno`:'—'}</td>
@@ -3144,7 +3144,7 @@ function openImmobileModal(im){
           <option value="">— Seleziona —</option>
           ${sediOrdinate().map(s=>`<option value="${s.id}"${im?.sede_id===s.id?' selected':''}>${esc(s.nome)}</option>`).join('')}
         </select></div>
-      <div class="fg"><div class="fl">Ragione sociale</div>
+      <div class="fg"><div class="fl">Ragione sociale (operativa)</div>
         <select class="fse" id="im-rag">
           <option value="">— Nessuna —</option>
           ${S.ragioni.map(r=>`<option value="${r.id}"${im?.ragione_sociale_id===r.id?' selected':''}>${esc(r.nome)}</option>`).join('')}
@@ -3157,18 +3157,33 @@ function openImmobileModal(im){
         <option value="sublet"${propVal==='sublet'?' selected':''}>Sublocazione</option>
       </select>
     </div>
-    <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 4px">Società proprietaria dell'immobile</div>
-    <div class="fg"><div class="fl">Denominazione</div><input class="fi" id="im-pnome" value="${esc(im?.prop_nome||'')}"/></div>
-    <div class="fr">
-      <div class="fg"><div class="fl">Partita IVA</div><input class="fi" id="im-ppiva" value="${esc(im?.prop_piva||'')}"/></div>
-      <div class="fg"><div class="fl">Codice fiscale</div><input class="fi" id="im-pcf" value="${esc(im?.prop_cf||'')}"/></div>
+
+    <div style="background:var(--g50);border-radius:var(--r);padding:14px;margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏢 Dati dell'immobile</div>
+      <div class="fg"><div class="fl">Indirizzo</div><input class="fi" id="im-ind" value="${esc(im?.indirizzo||'')}" placeholder="Via/piazza e numero civico"/></div>
+      <div class="fr">
+        <div class="fg"><div class="fl">CAP</div><input class="fi" id="im-cap" value="${esc(im?.cap||'')}" style="max-width:90px"/></div>
+        <div class="fg" style="flex:2"><div class="fl">Città</div><input class="fi" id="im-citta" value="${esc(im?.citta||'')}"/></div>
+        <div class="fg"><div class="fl">Prov.</div><input class="fi" id="im-prov" value="${esc(im?.provincia||'')}" style="max-width:60px"/></div>
+      </div>
     </div>
-    <div class="fg"><div class="fl">Indirizzo</div><input class="fi" id="im-pind" value="${esc(im?.prop_indirizzo||'')}"/></div>
-    <div class="fr">
-      <div class="fg"><div class="fl">Telefono</div><input class="fi" id="im-ptel" value="${esc(im?.prop_telefono||'')}"/></div>
-      <div class="fg"><div class="fl">Email</div><input class="fi" id="im-pemail" value="${esc(im?.prop_email||'')}"/></div>
+
+    <div style="border:1px solid var(--g200);border-radius:var(--r);padding:14px;margin-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📄 Società proprietaria / locatrice</div>
+      <div style="font-size:11.5px;color:var(--g500);margin-bottom:10px">L'azienda da cui l'immobile è affittato o subaffittato (o il proprietario, se di proprietà).</div>
+      <div class="fg"><div class="fl">Denominazione</div><input class="fi" id="im-pnome" value="${esc(im?.prop_nome||'')}"/></div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Partita IVA</div><input class="fi" id="im-ppiva" value="${esc(im?.prop_piva||'')}"/></div>
+        <div class="fg"><div class="fl">Codice fiscale</div><input class="fi" id="im-pcf" value="${esc(im?.prop_cf||'')}"/></div>
+      </div>
+      <div class="fg"><div class="fl">Indirizzo sede legale</div><input class="fi" id="im-pind" value="${esc(im?.prop_indirizzo||'')}"/></div>
+      <div class="fr">
+        <div class="fg"><div class="fl">Telefono</div><input class="fi" id="im-ptel" value="${esc(im?.prop_telefono||'')}"/></div>
+        <div class="fg"><div class="fl">Email</div><input class="fi" id="im-pemail" value="${esc(im?.prop_email||'')}"/></div>
+      </div>
+      <div class="fg"><div class="fl">PEC</div><input class="fi" id="im-ppec" value="${esc(im?.prop_pec||'')}"/></div>
     </div>
-    <div class="fg"><div class="fl">PEC</div><input class="fi" id="im-ppec" value="${esc(im?.prop_pec||'')}"/></div>
+
     <div id="im-rent-wrap" style="display:${propVal==='owned'?'none':''}">
       <div class="alert ai" style="font-size:12px;margin-top:10px">💡 Dopo aver salvato potrai gestire canoni, spese condominiali e scadenze di rinnovo dai pulsanti nella tabella.</div>
     </div>
@@ -3182,6 +3197,10 @@ function openImmobileModal(im){
         sede_id:sede,
         ragione_sociale_id:$('im-rag').value||null,
         proprieta:$('im-prop').value,
+        indirizzo:$('im-ind').value.trim()||null,
+        cap:$('im-cap').value.trim()||null,
+        citta:$('im-citta').value.trim()||null,
+        provincia:$('im-prov').value.trim()||null,
         prop_nome:$('im-pnome').value.trim()||null,
         prop_piva:$('im-ppiva').value.trim()||null,
         prop_cf:$('im-pcf').value.trim()||null,
