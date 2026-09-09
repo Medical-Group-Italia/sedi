@@ -351,6 +351,7 @@ const NAV_ADMIN = [
   {id:'produttori',  l:'Asset: produttori',   ic:'', r:['admin','it']},
   {id:'noleggiatori',l:'Asset: noleggiatori', ic:'', r:['admin','it']},
   {id:'utenti',      l:'Utenti',              ic:'', r:['admin','it']},
+  {id:'db_users',    l:'Utenti DB',           ic:'', r:['admin']},
   {id:'log',         l:'Log',                 ic:'', r:['admin','it']},
 ];
 // compatibilit- con codice che usa NAV
@@ -673,6 +674,7 @@ function renderPage(){
   else if(S.page==='aree')      renderAree(pb);
   else if(S.page==='asset_cat') renderAssetCategorie(pb);
   else if(S.page==='utenti')    renderUtenti(pb);
+  else if(S.page==='db_users')  renderDbUsers(pb);
   else if(S.page==='log')       renderLog(pb);
 }
 
@@ -4201,12 +4203,19 @@ function renderUtenti(pb){
    ACCESSI CROSS-TOOL
 =========================================================== */
 const TOOLS_MG = [
-  {prefix:'sp',        nome:'Prospect Sport'},
-  {prefix:'sedi',      nome:'Gestione Sedi'},
-  {prefix:'ferie',     nome:'Gestione Ferie'},
-  {prefix:'regint',    nome:'Registro Interventi'},
-  {prefix:'magazzino', nome:'Gestione Magazzino'},
-  {prefix:'progetti',  nome:'Gestione Progetti'},
+  {prefix:'checksedi',  nome:'Check Sedi'},
+  {prefix:'convenzioni',nome:'Gestione Convenzioni'},
+  {prefix:'desk',       nome:'Desk'},
+  {prefix:'ferie',      nome:'Gestione Ferie'},
+  {prefix:'intranet',   nome:'Intranet'},
+  {prefix:'luccatask',  nome:'Lucca Task'},
+  {prefix:'mdl',        nome:'MDL'},
+  {prefix:'progetti',   nome:'Gestione Progetti'},
+  {prefix:'regint',     nome:'Registro Interventi'},
+  {prefix:'sedi',       nome:'Gestione Sedi'},
+  {prefix:'servizi',    nome:'Servizi'},
+  {prefix:'sp',         nome:'Prospect Sport'},
+  {prefix:'task',       nome:'Task'},
 ];
 
 async function fetchProfiloAltroTool(prefix, userId, email){
@@ -4263,6 +4272,145 @@ async function openAccessiModal(u){
       el.innerHTML = `<span style="color:var(--g400)">Errore verifica</span>`;
     }
   }
+}
+
+/* ===========================================================
+   UTENTI DB (Supabase Auth Admin)
+=========================================================== */
+async function fetchDbUsers(){
+  const res=await fetch(`${CFG.FN}/sedi-manage-auth-users`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({action:'list'})
+  });
+  const data=await res.json();
+  if(!data.ok) throw new Error(data.error||'Errore nel caricamento utenti');
+  return data.users||[];
+}
+
+function renderDbUsers(pb){
+  pb.innerHTML=`<div class="fian"><div class="card">
+    <div class="ch"><span class="ct">🔑 Utenti DB (Supabase Auth)</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="fi-sm" id="dbu-search" style="width:220px" placeholder="🔍 Cerca email…"/>
+        <button class="btn bpg bsm" id="dbu-add">+ Nuovo utente</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--g500);padding:0 16px 10px">
+      ⚠ Questi utenti sono condivisi tra <b>tutti</b> i tool Medical Group. Disabilitare o eliminare un utente qui ne blocca l'accesso ovunque.
+    </div>
+    <div id="dbu-wrap" style="padding:0 16px 16px"><div class="emp"><div class="ems">Caricamento…</div></div></div>
+  </div></div>`;
+
+  let allUsers=[];
+  let q='';
+
+  const renderList=()=>{
+    const wrap=$('dbu-wrap'); if(!wrap) return;
+    const filtered=allUsers.filter(u=>!q||(u.email||'').toLowerCase().includes(q));
+    if(!filtered.length){wrap.innerHTML='<div class="emp"><div class="emi">🔑</div><div class="emt">Nessun utente trovato</div></div>';return;}
+    wrap.innerHTML=`<table class="dt"><thead><tr>
+      <th>Email</th><th>Creato il</th><th>Ultimo accesso</th><th>Stato</th><th>Azioni</th>
+    </tr></thead><tbody>
+    ${filtered.map(u=>{
+      const banned=u.banned_until && new Date(u.banned_until) > new Date();
+      return `<tr>
+        <td><div class="tn" style="font-family:monospace;font-size:12px">${esc(u.email||'—')}</div>
+          ${!u.email_confirmed_at?'<div class="ts" style="color:var(--red)">Email non confermata</div>':''}</td>
+        <td style="font-size:12px;color:var(--g500)">${u.created_at?fmtDt(u.created_at):'—'}</td>
+        <td style="font-size:12px;color:var(--g500)">${u.last_sign_in_at?fmtDt(u.last_sign_in_at):'Mai'}</td>
+        <td>${banned?'<span class="bg bg-off">Disabilitato</span>':'<span class="bg bg-on">Attivo</span>'}</td>
+        <td><div class="tda">
+          <button class="btn bs bsm" data-dbu-pwd="${u.id}" title="Reimposta password">🔒</button>
+          ${banned
+            ?`<button class="btn bs bsm" data-dbu-unban="${u.id}" title="Riabilita">✓ Riabilita</button>`
+            :`<button class="btn bs bsm" data-dbu-ban="${u.id}" title="Disabilita">⛔</button>`}
+          <button class="btn bd bsm" data-dbu-del="${u.id}" title="Elimina definitivamente">🗑</button>
+        </div></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+
+    wrap.querySelectorAll('[data-dbu-pwd]').forEach(b=>b.addEventListener('click',()=>openDbuPwdModal(b.dataset.dbuPwd)));
+    wrap.querySelectorAll('[data-dbu-ban]').forEach(b=>b.addEventListener('click',()=>{
+      const u=allUsers.find(x=>x.id===b.dataset.dbuBan);
+      openConf(`Disabilitare l'accesso di "${u?.email}" a TUTTI i tool Medical Group?`,async()=>{
+        await dbuAction('ban',{user_id:b.dataset.dbuBan});
+        toast('Utente disabilitato');
+        await reload();
+      });
+    }));
+    wrap.querySelectorAll('[data-dbu-unban]').forEach(b=>b.addEventListener('click',async()=>{
+      await dbuAction('unban',{user_id:b.dataset.dbuUnban});
+      toast('Utente riabilitato');
+      await reload();
+    }));
+    wrap.querySelectorAll('[data-dbu-del]').forEach(b=>b.addEventListener('click',()=>{
+      const u=allUsers.find(x=>x.id===b.dataset.dbuDel);
+      openConf(`ELIMINARE DEFINITIVAMENTE "${u?.email}"?\n\nQuesto rimuove l'accesso a TUTTI i tool e non e' reversibile. I profili nei singoli tool rimarranno orfani.`,async()=>{
+        await dbuAction('delete',{user_id:b.dataset.dbuDel});
+        toast('Utente eliminato');
+        await reload();
+      });
+    }));
+  };
+
+  const reload=async()=>{
+    const wrap=$('dbu-wrap');
+    if(wrap) wrap.innerHTML='<div class="emp"><div class="ems">Caricamento…</div></div>';
+    try{
+      allUsers=await fetchDbUsers();
+      renderList();
+    }catch(e){
+      if(wrap) wrap.innerHTML=`<div class="emp"><div class="emt" style="color:var(--red)">${esc(e.message)}</div></div>`;
+    }
+  };
+
+  $('dbu-search').addEventListener('input',e=>{q=e.target.value.toLowerCase();renderList();});
+  $('dbu-add').addEventListener('click',()=>openDbuCreateModal(reload));
+
+  reload();
+}
+
+async function dbuAction(action, extra){
+  const res=await fetch(`${CFG.FN}/sedi-manage-auth-users`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${S.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({action, ...extra})
+  });
+  const data=await res.json();
+  if(!data.ok) throw new Error(data.error||'Errore');
+  return data;
+}
+
+function openDbuPwdModal(userId){
+  openM('🔒 Reimposta password',`
+    <div class="fg"><div class="fl">Nuova password *</div><input class="fi" id="dbu-newpwd" type="password" placeholder="Minimo 6 caratteri"/></div>`,
+  [{l:'Annulla',c:'bs',a:closeM},{l:'Salva',c:'bpg',a:async()=>{
+    const pwd=$('dbu-newpwd').value;
+    if(pwd.length<6){toast('Password minimo 6 caratteri','err');return;}
+    try{
+      await dbuAction('reset_password',{user_id:userId,password:pwd});
+      closeM();toast('Password aggiornata ✅');
+    }catch(e){toast(e.message,'err');}
+  }}]);
+}
+
+function openDbuCreateModal(onDone){
+  openM('+ Nuovo utente DB',`
+    <div class="fg"><div class="fl">Email *</div><input class="fi" id="dbu-cr-email" type="email" placeholder="nome@medicalgroup.it"/></div>
+    <div class="fg"><div class="fl">Password *</div><input class="fi" id="dbu-cr-pwd" type="password" placeholder="Minimo 6 caratteri"/></div>
+    <div style="font-size:12px;color:var(--g500)">Nota: questo crea solo l'account di autenticazione. Per dare accesso a un tool specifico, usa "Utenti" nel tool desiderato.</div>`,
+  [{l:'Annulla',c:'bs',a:closeM},{l:'Crea',c:'bpg',a:async()=>{
+    const email=$('dbu-cr-email').value.trim();
+    const pwd=$('dbu-cr-pwd').value;
+    if(!email||pwd.length<6){toast('Compila email e password (min 6 caratteri)','err');return;}
+    try{
+      await dbuAction('create',{email,password:pwd});
+      closeM();toast('Utente creato ✅');
+      if(onDone) onDone();
+    }catch(e){toast(e.message,'err');}
+  }}]);
 }
 
 function openUtenteModal(u){
