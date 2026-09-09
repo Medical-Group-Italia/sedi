@@ -77,7 +77,7 @@ body{background:var(--g50);color:var(--g900);min-height:100vh;font-size:14px}
 /* ── Badges ── */
 .bg{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
 .bg-on{background:var(--green-light);color:#1A7A40}.bg-off{background:var(--g100);color:var(--g500)}
-.bg-adm{background:var(--navy);color:#fff}.bg-usr{background:var(--g100);color:var(--g700)}.bg-asset{background:#EEF5E3;color:#4a6b20}.bg-it{background:#DBEAFE;color:#1D4ED8}
+.bg-adm{background:var(--navy);color:#fff}.bg-usr{background:var(--g100);color:var(--g700)}.bg-asset{background:#EEF5E3;color:#4a6b20}.bg-it{background:#DBEAFE;color:#1D4ED8}.bg-adm-red{background:var(--red);color:#fff}.bg-noacc{background:var(--g700);color:#fff}
 
 /* ── Forms ── */
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -4114,7 +4114,7 @@ function renderUtenti(pb){
   if(!S._uState) S._uState={search:'',ruolo:'',stato:'',sort:'cognome',sortDir:1,page:0};
   const st=S._uState;
   const PAGE=20;
-  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT'],noaccess:['bg-off','Senza accesso']};
+  const RBADGE={admin:['bg-adm-red','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT'],noaccess:['bg-noacc','Senza accesso']};
   const isAdm=S.user?.ruolo==='admin';
 
   const thS=(col,lbl)=>`<th style="cursor:pointer;user-select:none" data-usort="${col}">${lbl}${st.sort===col?(st.sortDir===1?' ↑':' ↓'):''}</th>`;
@@ -4146,8 +4146,8 @@ function renderUtenti(pb){
         <td><span class="bg ${rc}">${rl}</span></td>
         <td><span class="bg ${u.attivo?'bg-on':'bg-off'}">${u.attivo?'Attivo':'Inattivo'}</span></td>
         <td><div class="tda">
-          <button class="btn bs bsm" data-ue="${u.id}">✏ Modifica</button>
           <button class="btn bs bsm" data-uacc="${u.id}" title="Accessi ad altri tool">🔗 Accessi</button>
+          <button class="btn bs bsm" data-ue="${u.id}">✏ Modifica</button>
           ${isAdm&&u.id!==S.user?.id?`<button class="btn bd bsm" data-ud="${u.id}">🗑 Rimuovi</button>`:''}
         </div></td>
       </tr>`;}).join('')}
