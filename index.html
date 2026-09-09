@@ -813,6 +813,13 @@ function buildMultiSel(id,selIds,onChange){
 
 /* PAGINA GRIGLIA */
 function renderGriglia(pb){
+  if(S.user?.ruolo==='noaccess'){
+    pb.innerHTML=`<div class="fian"><div class="card"><div class="emp">
+      <div class="emi">🔒</div>
+      <div class="emt">Il tuo account non ha accesso a nessuna sezione di questo tool.</div>
+    </div></div></div>`;
+    return;
+  }
   const isAdm=S.user?.ruolo==='admin';
   pb.innerHTML=`<div class="fian">
     <div class="filters-bar" id="gf-bar">
@@ -4107,7 +4114,7 @@ function renderUtenti(pb){
   if(!S._uState) S._uState={search:'',ruolo:'',stato:'',sort:'cognome',sortDir:1,page:0};
   const st=S._uState;
   const PAGE=20;
-  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT']};
+  const RBADGE={admin:['bg-adm','Admin'],asset:['bg-asset','Asset'],utente:['bg-usr','Utente'],it:['bg-it','IT'],noaccess:['bg-off','Senza accesso']};
   const isAdm=S.user?.ruolo==='admin';
 
   const thS=(col,lbl)=>`<th style="cursor:pointer;user-select:none" data-usort="${col}">${lbl}${st.sort===col?(st.sortDir===1?' ↑':' ↓'):''}</th>`;
@@ -4181,6 +4188,7 @@ function renderUtenti(pb){
           <option value="it"${st.ruolo==='it'?' selected':''}>IT</option>
           <option value="asset"${st.ruolo==='asset'?' selected':''}>Asset</option>
           <option value="utente"${st.ruolo==='utente'?' selected':''}>Utente</option>
+          <option value="noaccess"${st.ruolo==='noaccess'?' selected':''}>Senza accesso</option>
         </select>
         <select class="fi-sm" id="u-stato">
           <option value="">Tutti gli stati</option>
@@ -4243,7 +4251,8 @@ async function fetchProfiloAltroTool(prefix, userId, email){
 
 async function openAccessiModal(u){
   if(!u) return;
-  openM(`🔗 Accessi — ${u.nome} ${u.cognome}`,
+  const titolo = (u.nome||u.cognome) ? `${u.nome} ${u.cognome}` : u.email;
+  openM(`🔗 Accessi — ${esc(titolo)}`,
     `<div style="font-size:13px;color:var(--g500);margin-bottom:12px">${esc(u.email)}</div>
      <div id="accessi-list" style="display:flex;flex-direction:column;gap:8px">
        ${TOOLS_MG.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--g50);border-radius:var(--rsm)">
@@ -4261,7 +4270,8 @@ async function openAccessiModal(u){
     if(!el.isConnected) continue; // modale chiusa nel frattempo
     if(result.status==='found'){
       const attivoLabel = result.attivo===false ? ' <span style="color:var(--red)">(disattivato)</span>' : '';
-      el.innerHTML = `<span class="bg bg-on" style="font-size:11px">${esc(result.ruolo||'—')}</span>${attivoLabel}`;
+      const nomeProf = (result.nome||result.cognome) ? `<div style="font-size:11px;color:var(--g500)">${esc([result.cognome,result.nome].filter(Boolean).join(' '))}</div>` : '';
+      el.innerHTML = `<div style="text-align:right"><span class="bg bg-on" style="font-size:11px">${esc(result.ruolo||'—')}</span>${attivoLabel}${nomeProf}</div>`;
     }else if(result.status==='not_found'){
       el.innerHTML = `<span style="color:var(--g400)">Nessun accesso</span>`;
     }else if(result.status==='denied'){
@@ -4321,6 +4331,7 @@ function renderDbUsers(pb){
         <td style="font-size:12px;color:var(--g500)">${u.last_sign_in_at?fmtDt(u.last_sign_in_at):'Mai'}</td>
         <td>${banned?'<span class="bg bg-off">Disabilitato</span>':'<span class="bg bg-on">Attivo</span>'}</td>
         <td><div class="tda">
+          <button class="btn bs bsm" data-dbu-acc="${u.id}" title="Accessi ai tool">🔗</button>
           <button class="btn bs bsm" data-dbu-pwd="${u.id}" title="Reimposta password">🔒</button>
           ${banned
             ?`<button class="btn bs bsm" data-dbu-unban="${u.id}" title="Riabilita">✓ Riabilita</button>`
@@ -4331,6 +4342,10 @@ function renderDbUsers(pb){
     }).join('')}
     </tbody></table>`;
 
+    wrap.querySelectorAll('[data-dbu-acc]').forEach(b=>b.addEventListener('click',()=>{
+      const u=allUsers.find(x=>x.id===b.dataset.dbuAcc);
+      openAccessiModal({id:u.id,email:u.email,nome:'',cognome:''});
+    }));
     wrap.querySelectorAll('[data-dbu-pwd]').forEach(b=>b.addEventListener('click',()=>openDbuPwdModal(b.dataset.dbuPwd)));
     wrap.querySelectorAll('[data-dbu-ban]').forEach(b=>b.addEventListener('click',()=>{
       const u=allUsers.find(x=>x.id===b.dataset.dbuBan);
@@ -4435,6 +4450,7 @@ function openUtenteModal(u){
       <option value="asset"${u?.ruolo==='asset'?' selected':''}>Asset (asset, costi, fornitori)</option>
       <option value="it"${u?.ruolo==='it'?' selected':''}>IT (gestione IT)</option>
       <option value="admin"${u?.ruolo==='admin'?' selected':''}>Admin (accesso completo)</option>
+      <option value="noaccess"${u?.ruolo==='noaccess'?' selected':''}>Senza accesso (solo assegnazione asset)</option>
     </select></div>
     <div class="fg"><label class="tw">
       <div class="tg"><input type="checkbox" id="um-attivo" ${u?.attivo!==false?'checked':''}><span class="tsl"></span></div>
