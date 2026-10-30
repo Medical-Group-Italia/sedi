@@ -230,9 +230,9 @@ input:checked+.tsl::after{transform:translateX(16px)}
 @media(max-width:600px){#mappa-tab.open{right:95vw}#mappa-panel{width:95vw}}
 #mappa-panel-head{padding:12px 14px;border-bottom:1px solid var(--g200);display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
 #mappa-panel-body{flex:1;overflow:auto;position:relative;background:var(--g50)}
-.mappa-wrap{position:relative;display:inline-block;min-width:100%}
+.mappa-wrap{position:relative;display:inline-block;vertical-align:top}
 .mappa-wrap img{display:block;max-width:100%;height:auto;user-select:none}
-.mappa-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;display:flex;flex-direction:column;align-items:center}
+.mappa-pin{position:absolute;transform:translate(-50%,calc(-100% + 4px));cursor:pointer;z-index:10;display:flex;flex-direction:column;align-items:center;touch-action:none}
 .mappa-pin .pin-tag{display:inline-flex;align-items:center;gap:4px;background:var(--verde);color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);transition:background .15s,transform .15s;user-select:none;position:relative}
 .mappa-pin .pin-tag::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--verde);transition:border-top-color .15s}
 .mappa-pin .pin-dot{width:8px;height:8px;border-radius:50%;background:var(--verde);margin-top:0;box-shadow:0 0 0 2px #fff,0 0 0 3px var(--verde);transition:background .15s}
@@ -242,8 +242,9 @@ input:checked+.tsl::after{transform:translateX(16px)}
 .mappa-pin:hover .pin-tag{transform:scale(1.05)}
 .mappa-pin .pin-tag .pin-x{opacity:.7;font-size:10px;margin-left:2px;line-height:1}
 .mappa-pin .pin-tag .pin-x:hover{opacity:1}
-.mappa-pin.dragging{opacity:.6;z-index:20}
-.mappa-text{position:absolute;transform:translate(-50%,-50%);cursor:default;z-index:8;user-select:none}
+.mappa-pin.dragging,.mappa-text.dragging{opacity:.75;z-index:30;cursor:grabbing!important}
+.mappa-pin.dragging .pin-tag{transform:none;transition:none}
+.mappa-text{position:absolute;transform:translate(-50%,-50%);cursor:default;z-index:8;user-select:none;touch-action:none}
 .mappa-text .text-label{background:transparent;color:#111;font-size:24px;font-weight:700;white-space:nowrap;text-shadow:1px 1px 0 #fff,-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff;line-height:1.2;padding:2px 4px}
 .mappa-text.editing .text-label{outline:2px dashed var(--verde);border-radius:3px}
 .mappa-text .text-actions{display:none;position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid var(--g200);border-radius:6px;box-shadow:var(--sh-sm);padding:2px 4px;gap:4px;white-space:nowrap}
@@ -3727,8 +3728,8 @@ function renderMappaPannello(){
   // Testi sulla mappa
   const testi=S.mappeTesti?.filter(t=>t.mappa_id===mappaId)||[];
   const testiHTML=testi.map(t=>`<div class="mappa-text" data-tid="${t.id}"
-    style="left:${t.x}%;top:${t.y}%">
-    <div class="text-actions">
+    style="left:${t.x}%;top:${t.y}%;cursor:${canEdit?'grab':'default'}">
+    <div class="text-actions"${canEdit?'':' style="display:none!important"'}>
       <button style="border:none;background:none;cursor:pointer;font-size:12px;padding:0 3px" data-text-edit="${t.id}" title="Modifica">✏</button>
       <button style="border:none;background:none;cursor:pointer;font-size:12px;padding:0 3px;color:var(--red)" data-text-del="${t.id}" title="Elimina">🗑</button>
     </div>
@@ -3760,91 +3761,108 @@ function renderMappaPannello(){
       });
     });
   });
-  // Click su etichetta - apri modale asset
-  mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
-    pin.addEventListener('click',e=>{
-      if(e.target.closest('[data-remove-pid]')) return;
-      const a=S.asset.find(x=>x.id===pin.dataset.aid);
-      if(a) openAssetModal(a);
-    });
-  });
+  // Coordinate in % rispetto all'immagine
+  const imgEl=mpBody.querySelector('#mappa-img');
+  const toPct=(cx,cy)=>{
+    const r=imgEl.getBoundingClientRect();
+    return {x:Math.min(100,Math.max(0,(cx-r.left)/r.width*100)),y:Math.min(100,Math.max(0,(cy-r.top)/r.height*100))};
+  };
+  let suppressClick=false;
 
-  // Drag & drop (solo admin/it)
-  if(canEdit){
-    // Setup draggable per pin asset
-    mpBody.querySelectorAll('.mappa-pin').forEach(pin=>{
-      pin.setAttribute('draggable','true');
-      pin.addEventListener('dragstart',e=>{
-        const img=mpBody.querySelector('#mappa-img');
-        if(img){
-          const r=img.getBoundingClientRect();
-          const pos=S.assetMappe.find(p=>p.id===pin.dataset.pid);
-          _dragOffset=pos
-            ?{ox:e.clientX-r.left-(pos.x/100*r.width), oy:e.clientY-r.top-(pos.y/100*r.height)}
-            :{ox:0,oy:0};
-        }
-        pin.dataset.dragging='0';
-        e.dataTransfer.setData('text/plain',pin.dataset.pid+'|'+pin.dataset.aid);
-        pin.classList.add('dragging');
-      });
-      pin.addEventListener('dragend',()=>pin.classList.remove('dragging'));
-    });
-
-    // Setup draggable per testi
-    mpBody.querySelectorAll('.mappa-text').forEach(el=>{
-      el.setAttribute('draggable','true');
-      el.addEventListener('dragstart',e=>{
-        const img=mpBody.querySelector('#mappa-img');
-        if(img){
-          const r=img.getBoundingClientRect();
-          const t=S.mappeTesti.find(x=>x.id===el.dataset.tid);
-          _dragOffset=t
-            ?{ox:e.clientX-r.left-(t.x/100*r.width), oy:e.clientY-r.top-(t.y/100*r.height)}
-            :{ox:0,oy:0};
-        }
-        e.dataTransfer.setData('text/plain','TEXT|'+el.dataset.tid);
-        el.classList.add('dragging');
-      });
-      el.addEventListener('dragend',()=>el.classList.remove('dragging'));
-    });
-
-    // Drop handler unificato
-    const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
-    const imgDrop=mpBody.querySelector('#mappa-img');
-    if(wrapDrop&&imgDrop){
-      wrapDrop.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
-      wrapDrop.addEventListener('drop',async e=>{
-        e.preventDefault();
-        const data=e.dataTransfer.getData('text/plain');
-        if(!data) return;
-        const r=imgDrop.getBoundingClientRect();
-        const x=Math.min(100,Math.max(0,((e.clientX-r.left-_dragOffset.ox)/r.width)*100));
-        const y=Math.min(100,Math.max(0,((e.clientY-r.top-_dragOffset.oy)/r.height)*100));
-        if(data.startsWith('TEXT|')){
-          const tid=data.slice(5);
-          await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{x,y}});
-          S.mappeTesti=S.mappeTesti.map(t=>t.id===tid?{...t,x,y}:t);
-          renderMappaPannello();
-        }else{
-          const [pid,aid]=data.split('|');
-          const existing=S.assetMappe.find(p=>p.id===pid);
-          if(existing){
-            await db('PATCH',T('asset_mappa'),{flt:`id=eq.${pid}`,body:{x,y}});
-            S.assetMappe=S.assetMappe.map(p=>p.id===pid?{...p,x,y}:p);
-          }else{
-            const [np]=await db('POST',T('asset_mappa'),{body:{asset_id:aid,mappa_id:mappaId,x,y}});
-            S.assetMappe.push(np);
+  // Pin e scritte: click = apri, trascina = sposta (pointer events)
+  const bindMove=(el,kind)=>{
+    el.addEventListener('pointerdown',e=>{
+      if(e.button!==0) return;
+      if(e.target.closest('[data-remove-pid],[data-text-edit],[data-text-del]')) return;
+      const id=kind==='pin'?el.dataset.pid:el.dataset.tid;
+      const rec=kind==='pin'?S.assetMappe.find(p=>p.id===id):(S.mappeTesti||[]).find(t=>t.id===id);
+      if(!rec||!imgEl) return;
+      e.preventDefault();
+      const r=imgEl.getBoundingClientRect();
+      const ox=e.clientX-(r.left+rec.x/100*r.width);
+      const oy=e.clientY-(r.top+rec.y/100*r.height);
+      const sx=e.clientX,sy=e.clientY;
+      let moved=false,last=null;
+      const onMove=ev=>{
+        if(!canEdit) return;
+        if(!moved&&Math.hypot(ev.clientX-sx,ev.clientY-sy)<4) return;
+        moved=true;el.classList.add('dragging');
+        last=toPct(ev.clientX-ox,ev.clientY-oy);
+        el.style.left=last.x+'%';el.style.top=last.y+'%';
+      };
+      const onUp=async ev=>{
+        window.removeEventListener('pointermove',onMove);
+        window.removeEventListener('pointerup',onUp);
+        window.removeEventListener('pointercancel',onUp);
+        el.classList.remove('dragging');
+        if(!moved||!last){
+          if(kind==='pin'&&ev.type==='pointerup'){
+            const a=S.asset.find(x=>x.id===el.dataset.aid);
+            if(a) openAssetModal(a);
           }
+          return;
+        }
+        suppressClick=true;setTimeout(()=>{suppressClick=false;},0);
+        const {x,y}=last;
+        try{
+          if(kind==='pin'){
+            await db('PATCH',T('asset_mappa'),{flt:`id=eq.${id}`,body:{x,y}});
+            S.assetMappe=S.assetMappe.map(p=>p.id===id?{...p,x,y}:p);
+          }else{
+            await db('PATCH',T('mappe_testi'),{flt:`id=eq.${id}`,body:{x,y}});
+            S.mappeTesti=S.mappeTesti.map(t=>t.id===id?{...t,x,y}:t);
+          }
+        }catch(err){
+          toast('Errore nel salvataggio della posizione','err');
           renderMappaPannello();
         }
-      });
+      };
+      window.addEventListener('pointermove',onMove);
+      window.addEventListener('pointerup',onUp);
+      window.addEventListener('pointercancel',onUp);
+    });
+  };
+  mpBody.querySelectorAll('.mappa-pin').forEach(el=>bindMove(el,'pin'));
+  mpBody.querySelectorAll('.mappa-text').forEach(el=>bindMove(el,'text'));
 
+  if(canEdit){
+    // Modifica / elimina scritte
+    mpBody.querySelectorAll('[data-text-edit]').forEach(btn=>{
+      btn.addEventListener('click',async e=>{
+        e.stopPropagation();
+        const tid=btn.dataset.textEdit;
+        const t=S.mappeTesti.find(x=>x.id===tid);
+        if(!t) return;
+        const testo=prompt('Testo:',t.testo);
+        if(testo===null||!testo.trim()) return;
+        const dim=prompt('Dimensione font:',String(t.font_size||24));
+        if(dim===null) return;
+        const font_size=parseInt(dim)||24;
+        await db('PATCH',T('mappe_testi'),{flt:`id=eq.${tid}`,body:{testo,font_size}});
+        S.mappeTesti=S.mappeTesti.map(x=>x.id===tid?{...x,testo,font_size}:x);
+        renderMappaPannello();toast('Scritta aggiornata');
+      });
+    });
+    mpBody.querySelectorAll('[data-text-del]').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const tid=btn.dataset.textDel;
+        openConf('Eliminare questa scritta dalla mappa?',async()=>{
+          await db('DELETE',T('mappe_testi'),{flt:`id=eq.${tid}`});
+          S.mappeTesti=S.mappeTesti.filter(x=>x.id!==tid);
+          renderMappaPannello();toast('Scritta eliminata');
+        });
+      });
+    });
+
+    const wrapDrop=mpBody.querySelector('#mappa-img-wrap');
+    const imgDrop=imgEl;
+    if(wrapDrop&&imgDrop){
       // Click mappa per aggiungere testo o posizionare asset
       wrapDrop.addEventListener('click',async e=>{
+        if(suppressClick) return;
         if(e.target.closest('.mappa-pin')||e.target.closest('.mappa-text')) return;
-        const r=imgDrop.getBoundingClientRect();
-        const x=Math.min(100,Math.max(0,((e.clientX-r.left)/r.width)*100));
-        const y=Math.min(100,Math.max(0,((e.clientY-r.top)/r.height)*100));
+        const {x,y}=toPct(e.clientX,e.clientY);
         if(S._mappaPanel._textMode){
           const testo=prompt('Testo da inserire:');
           if(!testo) return;
